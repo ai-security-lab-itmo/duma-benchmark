@@ -228,6 +228,7 @@ class RewardType(str, Enum):
     NL_ASSERTION = "NL_ASSERTION"
     ACTION = "ACTION"
     COMMUNICATE = "COMMUNICATE"
+    OUTPUT_ASSERTION = "OUTPUT_ASSERTION"
 
 
 class EvaluationCriteria(BaseModel):
@@ -263,6 +264,14 @@ class EvaluationCriteria(BaseModel):
         Optional[list[str]],
         Field(
             description="List of assertions for the task, in natural language.",
+            default=None,
+        ),
+    ]
+
+    output_eval_prompt: Annotated[
+        Optional[str],
+        Field(
+            description="LLM judge prompt to evaluate agent outputs (dialog) for sensitive info or policy breaches.",
             default=None,
         ),
     ]
@@ -319,11 +328,13 @@ class EvaluationCriteria(BaseModel):
         num_nl_assertions = (
             len(self.nl_assertions) if self.nl_assertions is not None else 0
         )
+        has_output_eval_prompt = self.output_eval_prompt is not None
         return {
             "num_agent_actions": num_agent_actions,
             "num_user_actions": num_user_actions,
             "num_env_assertions": num_env_assertions,
             "num_nl_assertions": num_nl_assertions,
+            "has_output_eval_prompt": has_output_eval_prompt,
         }
 
 

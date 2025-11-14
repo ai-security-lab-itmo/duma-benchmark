@@ -14,6 +14,8 @@ from tau2.config import (
     DEFAULT_NUM_TRIALS,
     DEFAULT_SEED,
     DEFAULT_USER_IMPLEMENTATION,
+    DEFAULT_LLM_OUTPUT_ASSERTIONS,
+    DEFAULT_LLM_OUTPUT_ASSERTIONS_TEMPERATURE,
 )
 from tau2.data_model.simulation import RunConfig
 from tau2.run import get_options, run_domain
@@ -73,6 +75,18 @@ def add_run_args(parser):
         type=json.loads,
         default={"temperature": DEFAULT_LLM_TEMPERATURE_USER},
         help=f"The arguments to pass to the LLM for the user. Default is '{{\"temperature\": {DEFAULT_LLM_TEMPERATURE_USER}}}'.",
+    )
+    parser.add_argument(
+        "--output-eval-llm",
+        type=str,
+        default=DEFAULT_LLM_OUTPUT_ASSERTIONS,
+        help=f"The LLM to use for output assertions evaluator. Default is {DEFAULT_LLM_OUTPUT_ASSERTIONS}.",
+    )
+    parser.add_argument(
+        "--output-eval-llm-args",
+        type=json.loads,
+        default={"temperature": DEFAULT_LLM_OUTPUT_ASSERTIONS_TEMPERATURE},
+        help=f"The arguments to pass to the LLM for output assertions evaluator. Default is '{{\"temperature\": {DEFAULT_LLM_OUTPUT_ASSERTIONS_TEMPERATURE}}}'.",
     )
     parser.add_argument(
         "--task-set-name",
@@ -151,6 +165,8 @@ def main():
                 user=args.user,
                 llm_user=args.user_llm,
                 llm_args_user=args.user_llm_args,
+                llm_output_eval=args.output_eval_llm,
+                llm_args_output_eval=args.output_eval_llm_args,
                 num_trials=args.num_trials,
                 max_steps=args.max_steps,
                 max_errors=args.max_errors,

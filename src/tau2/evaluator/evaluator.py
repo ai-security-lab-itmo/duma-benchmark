@@ -6,6 +6,7 @@ from tau2.evaluator.evaluator_action import ActionEvaluator
 from tau2.evaluator.evaluator_communicate import CommunicateEvaluator
 from tau2.evaluator.evaluator_env import EnvironmentEvaluator
 from tau2.evaluator.evaluator_nl_assertions import NLAssertionsEvaluator
+from tau2.evaluator.evaluator_output_assertions import OutputAssertionsEvaluator
 from tau2.registry import registry
 
 
@@ -16,6 +17,7 @@ class EvaluationType(str, Enum):
     ALL = "all"
     NL_ASSERTIONS = "nl_assertions"  # WIP
     ALL_WITH_NL_ASSERTIONS = "all_with_nl_assertions"  # WIP
+    OUTPUT_ASSERTIONS = "output_assertions"
 
 
 def evaluate_simulation(
@@ -65,6 +67,11 @@ def evaluate_simulation(
             task=task,
             full_trajectory=simulation.messages,
         )
+    elif evaluation_type == EvaluationType.OUTPUT_ASSERTIONS:
+        reward_info = OutputAssertionsEvaluator.calculate_reward(
+            task=task,
+            full_trajectory=simulation.messages,
+        )
     elif evaluation_type in {EvaluationType.ALL, EvaluationType.ALL_WITH_NL_ASSERTIONS}:
         env_reward_info = EnvironmentEvaluator.calculate_reward(
             environment_constructor=registry.get_env_constructor(domain),
@@ -86,6 +93,10 @@ def evaluate_simulation(
                 task=task,
                 full_trajectory=simulation.messages,
             )
+        output_reward_info = OutputAssertionsEvaluator.calculate_reward(
+            task=task,
+            full_trajectory=simulation.messages,
+        )
 
         ## Combine all the rewards.
         reward = 1.0
@@ -93,6 +104,7 @@ def evaluate_simulation(
         action_bases = {RewardType.ACTION}
         nl_bases = {RewardType.NL_ASSERTION}
         comm_bases = {RewardType.COMMUNICATE}
+        output_bases = {RewardType.OUTPUT_ASSERTION}
         task_reward_basis = set(task.evaluation_criteria.reward_basis)
 
         reward_breakdown = {}
@@ -116,6 +128,10 @@ def evaluate_simulation(
             if communicate_reward_info.reward_breakdown is not None:
                 reward_breakdown.update(communicate_reward_info.reward_breakdown)
             reward *= communicate_reward_info.reward
+        if task_reward_basis & output_bases:
+            if output_reward_info.reward_breakdown is not None:
+                reward_breakdown.update(output_reward_info.reward_breakdown)
+            reward *= output_reward_info.reward
 
         reward_info = RewardInfo(
             reward=reward,
@@ -133,6 +149,7 @@ def evaluate_simulation(
                 "nl": nl_reward_info.info if nl_reward_info is not None else None,
                 "communicate": communicate_reward_info.info,
                 "action": action_reward_info.info,
+                "output": output_reward_info.info,
             },
         )
     else:

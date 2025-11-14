@@ -137,6 +137,8 @@ def run_domain(config: RunConfig) -> Results:
         llm_args_agent=config.llm_args_agent,
         llm_user=config.llm_user,
         llm_args_user=config.llm_args_user,
+        llm_output_eval=config.llm_output_eval,
+        llm_args_output_eval=config.llm_args_output_eval,
         num_trials=num_trials,
         max_steps=config.max_steps,
         max_errors=config.max_errors,
@@ -162,6 +164,8 @@ def run_tasks(
     llm_args_agent: Optional[dict] = None,
     llm_user: Optional[str] = None,
     llm_args_user: Optional[dict] = None,
+    llm_output_eval: Optional[str] = None,
+    llm_args_output_eval: Optional[dict] = None,
     num_trials: int = 1,
     max_steps: int = 100,
     max_errors: int = 10,
@@ -217,6 +221,15 @@ def run_tasks(
 
     if "seed" in llm_args_user:
         logger.warning("Each trial will modify the seed for the user")
+
+    # Make output evaluator model configurable at runtime by updating module defaults
+    if llm_output_eval is not None or llm_args_output_eval is not None:
+        from tau2 import config as tau2_config
+
+        if llm_output_eval is not None:
+            tau2_config.DEFAULT_LLM_OUTPUT_ASSERTIONS = llm_output_eval
+        if llm_args_output_eval is not None:
+            tau2_config.DEFAULT_LLM_OUTPUT_ASSERTIONS_ARGS = llm_args_output_eval
 
     lock = multiprocessing.Lock()
 

@@ -12,6 +12,8 @@ from tau2.config import (
     DEFAULT_LLM_ARGS_AGENT,
     DEFAULT_LLM_ARGS_USER,
     DEFAULT_LLM_USER,
+    DEFAULT_LLM_OUTPUT_ASSERTIONS,
+    DEFAULT_LLM_OUTPUT_ASSERTIONS_ARGS,
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_MAX_ERRORS,
@@ -102,6 +104,20 @@ class RunConfig(BaseModel):
         Field(
             description="The arguments to pass to the LLM for the user",
             default_factory=lambda: deepcopy(DEFAULT_LLM_ARGS_USER),
+        ),
+    ]
+    llm_output_eval: Annotated[
+        str,
+        Field(
+            description="The model to use for LLM output assertions evaluator",
+            default=DEFAULT_LLM_OUTPUT_ASSERTIONS,
+        ),
+    ]
+    llm_args_output_eval: Annotated[
+        dict,
+        Field(
+            description="The arguments to pass to the LLM for output assertions evaluator",
+            default_factory=lambda: deepcopy(DEFAULT_LLM_OUTPUT_ASSERTIONS_ARGS),
         ),
     ]
     num_trials: Annotated[
