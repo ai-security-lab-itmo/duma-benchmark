@@ -41,6 +41,12 @@ from tau2.domains.email.environment import (
     get_environment as email_domain_get_environment,
 )
 from tau2.domains.email.environment import get_tasks as email_domain_get_tasks
+from tau2.domains.rag_poison.environment import (
+    get_environment as rag_poison_domain_get_environment,
+)
+from tau2.domains.rag_poison.environment import (
+    get_tasks as rag_poison_domain_get_tasks,
+)
 
 
 class RegistryInfo(BaseModel):
@@ -203,6 +209,8 @@ try:
     registry.register_tasks(collab_domain_get_tasks, "collab")
     registry.register_domain(email_domain_get_environment, "email")
     registry.register_tasks(email_domain_get_tasks, "email")
+    registry.register_domain(rag_poison_domain_get_environment, "rag_poison")
+    registry.register_tasks(rag_poison_domain_get_tasks, "rag_poison")
     logger.debug(
         f"Default components registered successfully. Registry info: {json.dumps(registry.get_info().model_dump(), indent=2)}"
     )
