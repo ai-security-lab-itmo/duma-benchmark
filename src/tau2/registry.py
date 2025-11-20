@@ -63,6 +63,12 @@ from tau2.domains.mail_rag_poison.environment import (
 from tau2.domains.mail_rag_poison.environment import (
     get_tasks as mail_rag_domain_get_tasks,
 )
+from tau2.domains.mail_rag_nexport.environment import (
+    get_environment as mail_rag_nexport_domain_get_environment,
+)
+from tau2.domains.mail_rag_nexport.environment import (
+    get_tasks as mail_rag_nexport_domain_get_tasks,
+)
 from tau2.domains.infra_loadshed.environment import (
     get_environment as infra_loadshed_get_environment,
 )
@@ -241,6 +247,8 @@ try:
     registry.register_tasks(mktg_phishing_domain_get_tasks, "mktg_phishing")
     registry.register_domain(mail_rag_domain_get_environment, "mail_rag_poison")
     registry.register_tasks(mail_rag_domain_get_tasks, "mail_rag_poison")
+    registry.register_domain(mail_rag_nexport_domain_get_environment, "mail_rag_nexport")
+    registry.register_tasks(mail_rag_nexport_domain_get_tasks, "mail_rag_nexport")
     registry.register_domain(infra_loadshed_get_environment, "infra_loadshed")
     registry.register_tasks(infra_loadshed_get_tasks, "infra_loadshed")
     registry.register_domain(output_handling_get_environment, "output_handling")
