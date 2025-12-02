@@ -22,6 +22,19 @@ from tau2.metrics.agent_metrics import AgentMetrics, is_successful
 class ConsoleDisplay:
     console = Console()
 
+    @staticmethod
+    def _redact_keys(data: dict, keys: tuple[str, ...] = ("api_key", "api_base")) -> dict:
+        """Return a shallow copy of dict with sensitive keys redacted."""
+        if not isinstance(data, dict):
+            return data
+        redacted = {}
+        for k, v in data.items():
+            if k in keys and v is not None:
+                redacted[k] = "***"
+            else:
+                redacted[k] = v
+        return redacted
+
     @classmethod
     def display_run_config(cls, config: RunConfig):
         # Create layout
@@ -53,7 +66,7 @@ class ConsoleDisplay:
             f"[white]Implementation:[/] {config.agent}\n"
             f"[white]Model:[/] {config.llm_agent}\n"
             "[white]LLM Arguments:[/]\n"
-            f"{json.dumps(config.llm_args_agent, indent=2)}",
+            f"{json.dumps(cls._redact_keys(config.llm_args_agent), indent=2)}",
             title="[bold cyan]Agent Configuration",
             border_style="cyan",
         )
@@ -62,7 +75,7 @@ class ConsoleDisplay:
             f"[white]Implementation:[/] {config.user}\n"
             f"[white]Model:[/] {config.llm_user}\n"
             "[white]LLM Arguments:[/]\n"
-            f"{json.dumps(config.llm_args_user, indent=2)}",
+            f"{json.dumps(cls._redact_keys(config.llm_args_user), indent=2)}",
             title="[bold cyan]User Configuration",
             border_style="cyan",
         )

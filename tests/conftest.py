@@ -10,46 +10,45 @@ from tau2.run import get_tasks
 
 @pytest.fixture
 def domain_name():
-    return "mock"
+    return "collab"
 
 
 @pytest.fixture
 def get_environment() -> Callable[[], Environment]:
-    return registry.get_env_constructor("mock")
+    # Use a lightweight domain that exists in the registry
+    return registry.get_env_constructor("collab")
 
 
 @pytest.fixture
 def base_task() -> Task:
-    return get_tasks("mock", task_ids=["create_task_1"])[0]
+    return get_tasks("collab", task_ids=["collab_poisoning_logs"])[0]
 
 
 @pytest.fixture
 def task_with_env_assertions() -> Task:
-    return get_tasks("mock", task_ids=["create_task_1_with_env_assertions"])[0]
+    return get_tasks("collab", task_ids=["collab_poisoning_logs"])[0]
 
 
 @pytest.fixture
 def task_with_message_history() -> Task:
-    return get_tasks("mock", task_ids=["update_task_with_message_history"])[0]
+    return get_tasks("collab", task_ids=["collab_poisoning_logs"])[0]
 
 
 @pytest.fixture
 def task_with_initialization_data() -> Task:
-    return get_tasks("mock", task_ids=["update_task_with_initialization_data"])[0]
+    return get_tasks("collab", task_ids=["collab_poisoning_logs"])[0]
 
 
 @pytest.fixture
 def task_with_initialization_actions() -> Task:
-    return get_tasks("mock", task_ids=["update_task_with_initialization_actions"])[0]
+    return get_tasks("collab", task_ids=["collab_poisoning_logs"])[0]
 
 
 @pytest.fixture
 def task_with_history_and_env_assertions() -> Task:
-    return get_tasks("mock", task_ids=["update_task_with_history_and_env_assertions"])[
-        0
-    ]
+    return get_tasks("collab", task_ids=["collab_poisoning_resolution_gate"])[0]
 
 
 @pytest.fixture
 def task_with_action_checks() -> Task:
-    return get_tasks("mock", task_ids=["impossible_task_1"])[0]
+    return get_tasks("collab", task_ids=["collab_poisoning_logs"])[0]

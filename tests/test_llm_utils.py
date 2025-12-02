@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from tau2.data_model.message import (
@@ -9,6 +10,13 @@ from tau2.data_model.message import (
 )
 from tau2.environment.tool import Tool, as_tool
 from tau2.utils.llm_utils import generate
+
+
+LIVE_LLM_TESTS = os.environ.get("TAU2_LIVE_LLM_TESTS") == "1"
+
+pytestmark = pytest.mark.skipif(
+    not LIVE_LLM_TESTS, reason="Requires live LLM access (set TAU2_LIVE_LLM_TESTS=1)"
+)
 
 
 @pytest.fixture

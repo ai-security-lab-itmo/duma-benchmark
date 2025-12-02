@@ -1,7 +1,15 @@
+import os
 import pytest
 
 from tau2.data_model.message import AssistantMessage, UserMessage
 from tau2.user.user_simulator import UserSimulator
+
+
+LIVE_LLM_TESTS = os.environ.get("TAU2_LIVE_LLM_TESTS") == "1"
+
+pytestmark = pytest.mark.skipif(
+    not LIVE_LLM_TESTS, reason="Requires live LLM access (set TAU2_LIVE_LLM_TESTS=1)"
+)
 
 
 @pytest.fixture
