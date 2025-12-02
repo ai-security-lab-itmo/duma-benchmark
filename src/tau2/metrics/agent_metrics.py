@@ -19,11 +19,13 @@ class AgentMetrics(BaseModel):
     avg_reward: float
     pass_hat_ks: dict[int, float]
     avg_agent_cost: float
+    success_rate: float
 
     def as_dict(self) -> dict:
         data = {
             "avg_reward": self.avg_reward,
             "avg_agent_cost": self.avg_agent_cost,
+            "success_rate": self.success_rate,
         }
         for k, v in self.pass_hat_ks.items():
             data[f"pass_hat_{k}"] = v
@@ -110,6 +112,7 @@ def compute_metrics(results: Results) -> AgentMetrics:
     """
     df, df_pass_hat_k = prepare_dfs(results)
     avg_reward = df.reward.mean()
+    success_rate = df.success.mean() if not df.empty else 0.0
     pass_hat_ks = {}
     for column in df_pass_hat_k.columns:
         if match := re.match(r"pass\^(\d+)", column):
@@ -120,11 +123,13 @@ def compute_metrics(results: Results) -> AgentMetrics:
         avg_reward=avg_reward,
         pass_hat_ks=pass_hat_ks,
         avg_agent_cost=avg_agent_cost,
+        success_rate=success_rate,
     )
 
 
 def display_metrics(metrics: AgentMetrics) -> None:
     print(f"🏆 Average reward: {metrics.avg_reward}")
+    print(f"✅ Success rate: {metrics.success_rate}")
     print("📈 Pass^k")
     for k, pass_hat_k in metrics.pass_hat_ks.items():
         print(f"  k={k}: {pass_hat_k}")

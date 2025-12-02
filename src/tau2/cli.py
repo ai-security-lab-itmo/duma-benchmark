@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 
 from tau2.config import (
     DEFAULT_AGENT_IMPLEMENTATION,
@@ -25,19 +26,20 @@ from tau2.scripts.leaderboard.verify_trajectories import VerificationMode
 def add_run_args(parser):
     """Add run arguments to a parser."""
     domains = get_options().domains
+    domain_choices = domains + ["all"]
     parser.add_argument(
         "--domain",
         "-d",
         type=str,
-        choices=domains,
-        help="The domain to run the simulation on (use --domains for multiple domains)",
+        choices=domain_choices,
+        help="The domain to run the simulation on (use --domains for multiple domains, or 'all' for every domain)",
     )
     parser.add_argument(
         "--domains",
         nargs="+",
         type=str,
-        choices=domains,
-        help="List of domains to run the simulation on (saves to multi-domain format)",
+        choices=domain_choices,
+        help="List of domains to run the simulation on (saves to multi-domain format). Use 'all' to run every registered domain.",
     )
     parser.add_argument(
         "--num-trials",
@@ -65,6 +67,12 @@ def add_run_args(parser):
         help=f"The arguments to pass to the LLM for the agent. Default is '{{\"temperature\": {DEFAULT_LLM_TEMPERATURE_AGENT}}}'.",
     )
     parser.add_argument(
+        "--agent-base-url",
+        type=str,
+        default=None,
+        help="Optional base URL for the agent LLM API (overrides api_base in agent-llm-args).",
+    )
+    parser.add_argument(
         "--user",
         type=str,
         choices=get_options().users,
@@ -82,6 +90,23 @@ def add_run_args(parser):
         type=json.loads,
         default={"temperature": DEFAULT_LLM_TEMPERATURE_USER},
         help=f"The arguments to pass to the LLM for the user. Default is '{{\"temperature\": {DEFAULT_LLM_TEMPERATURE_USER}}}'.",
+    )
+    parser.add_argument(
+        "--user-base-url",
+        type=str,
+        default=None,
+        help="Optional base URL for the user LLM API (overrides api_base in user-llm-args).",
+    )
+    parser.add_argument(
+        "--api-key-env",
+        type=str,
+        default=None,
+        help="Environment variable name for the LLM API key (defaults to OPENAI_API_KEY if set).",
+    )
+    parser.add_argument(
+        "--local-models",
+        action="store_true",
+        help="Use local models (skip injecting api_key/api_base).",
     )
     parser.add_argument(
         "--output-eval-llm",
@@ -150,6 +175,28 @@ def add_run_args(parser):
         default=DEFAULT_LOG_LEVEL,
         help=f"The log level to use for the simulation. Default is {DEFAULT_LOG_LEVEL}.",
     )
+
+
+def _build_llm_args(base_args: dict, base_url: str | None, api_key_env: str | None, use_local: bool) -> dict:
+    """Merge base args with optional api_base and api_key injection.
+
+    If use_local is True, api_key/api_base are stripped to support local providers.
+    """
+    args = dict(base_args or {})
+    if use_local:
+        args.pop("api_key", None)
+        args.pop("api_base", None)
+        return args
+
+    if base_url:
+        args["api_base"] = base_url
+
+    env_name = api_key_env or "OPENAI_API_KEY"
+    api_key = os.getenv(env_name)
+    if api_key:
+        args.setdefault("api_key", api_key)
+
+    return args
 
 
 def main():
@@ -292,6 +339,13 @@ def main():
 
 def run_command(args):
     """Run command handler that supports both single and multi-domain runs."""
+    agent_llm_args = _build_llm_args(
+        args.agent_llm_args, args.agent_base_url, args.api_key_env, args.local_models
+    )
+    user_llm_args = _build_llm_args(
+        args.user_llm_args, args.user_base_url, args.api_key_env, args.local_models
+    )
+
     config = RunConfig(
         domain=args.domain or "",  # Will be ignored if domains is provided
         task_set_name=args.task_set_name,
@@ -299,10 +353,10 @@ def run_command(args):
         num_tasks=args.num_tasks,
         agent=args.agent,
         llm_agent=args.agent_llm,
-        llm_args_agent=args.agent_llm_args,
+        llm_args_agent=agent_llm_args,
         user=args.user,
         llm_user=args.user_llm,
-        llm_args_user=args.user_llm_args,
+        llm_args_user=user_llm_args,
         llm_output_eval=args.output_eval_llm,
         llm_args_output_eval=args.output_eval_llm_args,
         num_trials=args.num_trials,
@@ -314,15 +368,21 @@ def run_command(args):
         log_level=args.log_level,
     )
     
+    available_domains = get_options().domains
+
     if args.domains:
         # Multi-domain run
         if args.domain:
             raise ValueError("Cannot use both --domain and --domains. Use --domains for multiple domains.")
-        return run_domains(domains=args.domains, config=config)
+        domains = available_domains if "all" in args.domains else args.domains
+        return run_domains(domains=domains, config=config)
     else:
         # Single domain run
         if not args.domain:
             raise ValueError("Either --domain or --domains must be specified.")
+        if args.domain == "all":
+            # Treat single-domain 'all' as a multi-domain run
+            return run_domains(domains=available_domains, config=config)
         config.domain = args.domain
         return run_domain(config)
 

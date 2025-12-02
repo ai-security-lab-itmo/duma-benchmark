@@ -35,8 +35,6 @@ The τ²-bench leaderboard is now live at **[taubench.com](https://taubench.com)
 
 $\tau^2$-bench implements a simulation framework for evaluating customer service agents across various domains.
 
-**$\tau^2$-bench is the new iteration of the original $\tau$-bench**, featuring code fixes and an additional telecom domain.
-
 Each domain specifies:
 - a policy that the agent must follow
 - a set of tools that the agent can use
@@ -44,15 +42,12 @@ Each domain specifies:
 - Optionally: A set of tools that the user simulator can use
 
 Domains are:
-- `mock`
-- `airline`
-- `retail`
-- `telecom`
 - `collab` (cross-agent poisoning)
+- `crm_leak` (customer data leakage)
+- `mail_rag_nexport` (mailbox data exfiltration)
+- `mail_rag_phishing` (phishing via RAG)
 - `infra_loadshed` (resource overload / denial-of-wallet)
 - `output_handling` (improper output filtering)
-- `collab` (cross-agent poisoning)
-- `infra_loadshed` (resource overload / denial-of-wallet)
 
 All the information that an agent developer needs to build an agent for a domain can be accessed through the domain's API docs. See [View domain documentation](#view-domain-documentation) for more details.
 
@@ -116,7 +111,7 @@ To run a test evaluation on only 5 tasks with 1 trial per task, run:
 
 ```bash
 tau2 run \ 
---domain airline \
+--domain collab \
 --agent-llm gpt-4.1 \
 --user-llm gpt-4.1 \
 --num-trials 1 \
@@ -157,6 +152,18 @@ tau2 domain <domain>
 ```
 Visit http://127.0.0.1:8004/redoc to see the domain policy and API documentation.
 
+### Run multiple domains with custom endpoints
+```bash
+tau2 run \
+  --domains collab infra_loadshed output_handling \
+  --agent-llm gpt-4o-mini \
+  --user-llm gpt-4o-mini \
+  --api-key-env ALTERNATIVE_API_KEY \
+  --agent-base-url https://api.openai.com/v1 \
+  --max-concurrency 2
+```
+Use `--local-models` to skip API keys for local providers, and `--user-base-url`/`--agent-base-url` to point to custom endpoints.
+
 ![domain_viewer1](figs/domain_viewer.png)
 
 ### Check data configuration
@@ -173,10 +180,13 @@ To submit your agent results to the τ²-bench leaderboard, you need to prepare 
 
 Your trajectory runs must follow these constraints:
 
-1. **Complete domain coverage**: Include results for all three domains:
-   - `retail`
-   - `airline` 
-   - `telecom`
+1. **Complete domain coverage**: Include results for all core domains:
+   - `collab`
+   - `crm_leak`
+   - `mail_rag_nexport`
+   - `mail_rag_phishing`
+   - `infra_loadshed`
+   - `output_handling`
 
 2. **Consistent model configuration**: All trajectory files must use:
    - The same agent LLM with identical arguments across all domains
@@ -193,9 +203,8 @@ First, run your agent evaluation on all domains with consistent settings:
 
 ```bash
 # Example: Run complete evaluation for all domains
-tau2 run --domain retail --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 4 --save-to my_model_retail
-tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 4 --save-to my_model_airline  
-tau2 run --domain telecom --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 4 --save-to my_model_telecom
+tau2 run --domains collab crm_leak mail_rag_nexport mail_rag_phishing infra_loadshed output_handling \
+  --agent-llm gpt-4.1 --user-llm gpt-4.1 --num-trials 4 --save-to my_model_all
 ```
 
 **Important**: Use identical `--agent-llm`, `--user-llm`, and their arguments across all runs.
@@ -264,45 +273,6 @@ The `@experiments/` directory contains experimental features and research code t
 
 For more details, see the [experiments README](src/experiments/README.md).
 
-### Running Ablation Studies (No User, or Agent with Oracle Plan)
-`telecom` domain enables running ablation studies.
-
-1. Running an LLM in `no-user` mode. In this mode, the LLM is given all the tools and the information upfront.
-Just choose `llm_agent_solo` as the agent and `dummy_user` as the user.
-
-```bash
-tau2 run \
-  --domain telecom \
-  --agent llm_agent_solo \
-  --agent-llm gpt-4.1 \
-  --user dummy_user \
-  ...
-```
-
-2. Running an LLM in `oracle-plan` mode. In this mode, the LLM is given an oracle plan ahead of time alleviating the need for action planning.
-Just choose `llm_agent_gt` as the agent.
-
-```bash
-tau2 run \
-  --domain telecom \
-  --agent llm_agent_gt \
-  --agent-llm gpt-4.1 \
-  --user-llm gpt-4.1 \
-  ...
-```
-
-### Running Telecom Domain with Workflow Policy
-To test the impact of policy format, we provide an additional "workflow" policy for the telecom domain.
-To run using this policy, use the `telecom-workflow` domain.
-
-```bash
-tau2 run \
-  --domain telecom-workflow \
-  --agent-llm gpt-4.1 \
-  --user-llm gpt-4.1 \
-  ...
-```
-
 ## Domains
 
 For all the details see the domains [README](src/tau2/domains/README.md).
@@ -325,7 +295,7 @@ Then visit http://127.0.0.1:8004/redoc
 
 An interactive command-line interface for directly querying and testing domain environments. Features:
 - Interactive query interface with domain-specific tools
-- Support for multiple domains (airline, mock, etc.)
+- Support for multiple domains (collab, infra_loadshed, crm_leak, mail_rag_*, output_handling)
 - Session management with history
 
 To use:
@@ -343,7 +313,7 @@ Example usage:
 $ make env-cli
 
 Welcome to the Environment CLI!
-Connected to airline domain.
+Connected to collab domain.
 
 Query (:n new session, :d change domain, :q quit)> What flights are available from SF to LA tomorrow?
 Assistant: Let me check the flight availability for you...

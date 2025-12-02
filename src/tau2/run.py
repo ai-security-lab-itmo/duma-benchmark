@@ -215,6 +215,7 @@ def run_domains(domains: list[str], config: RunConfig) -> MultiDomainResults:
     multi_domain_results.save(save_to_path)
     
     # Run each domain
+    metrics_per_domain = {}
     for i, domain in enumerate(domains):
         ConsoleDisplay.console.print(
             f"\n[bold cyan]Running domain {i+1}/{len(domains)}: {domain}[/bold cyan]\n"
@@ -254,9 +255,36 @@ def run_domains(domains: list[str], config: RunConfig) -> MultiDomainResults:
         
         # Display metrics for this domain
         from tau2.metrics.agent_metrics import compute_metrics
+
         metrics = compute_metrics(domain_results)
+        metrics_per_domain[domain] = metrics
         ConsoleDisplay.display_agent_metrics(metrics)
     
+    # Aggregate metrics across domains
+    if metrics_per_domain:
+        # Average metrics; pass_hat_k averaged over domains where present
+        total_reward = sum(m.avg_reward for m in metrics_per_domain.values())
+        total_success = sum(m.success_rate for m in metrics_per_domain.values())
+        total_cost = sum(m.avg_agent_cost for m in metrics_per_domain.values())
+        count = len(metrics_per_domain)
+        aggregated_pass_k: dict[int, list[float]] = {}
+        for m in metrics_per_domain.values():
+            for k, v in m.pass_hat_ks.items():
+                aggregated_pass_k.setdefault(k, []).append(v)
+
+        pass_k_avg = {k: sum(vs) / len(vs) for k, vs in aggregated_pass_k.items()}
+
+        ConsoleDisplay.console.print("\n[bold magenta]Aggregated metrics across domains[/bold magenta]")
+        ConsoleDisplay.console.print(
+            f"Average reward: {total_reward / count:.4f}\n"
+            f"Success rate: {total_success / count:.4f}\n"
+            f"Average agent cost: {total_cost / count:.4f}"
+        )
+        if pass_k_avg:
+            ConsoleDisplay.console.print("Pass^k (domain-average):")
+            for k, v in sorted(pass_k_avg.items()):
+                ConsoleDisplay.console.print(f"  k={k}: {v:.4f}")
+
     ConsoleDisplay.console.print(
         f"\n✨ [bold green]Successfully completed all domains![/bold green]\n"
         f"Results saved to: [bold blue]{save_to_path}[/bold blue]\n"
