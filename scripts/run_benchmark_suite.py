@@ -228,7 +228,7 @@ def main():
     parser.add_argument(
         "--max-workers",
         type=int,
-        default=10,
+        default=1,
         help="Maximum number of parallel processes (default: 2)",
     )
     parser.add_argument(
