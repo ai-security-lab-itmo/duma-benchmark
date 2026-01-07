@@ -228,7 +228,7 @@ def main():
     parser.add_argument(
         "--max-workers",
         type=int,
-        default=1,
+        default=10,
         help="Maximum number of parallel processes (default: 2)",
     )
     parser.add_argument(
@@ -278,6 +278,10 @@ def main():
     if successful_files:
         console.print("\n[bold cyan]Collecting metrics and saving to CSV...[/bold cyan]")
         try:
+            # Ensure output_dir has a value (use same default as run_benchmark_suite)
+            if output_dir is None:
+                from tau2.utils.utils import DATA_DIR
+                output_dir = DATA_DIR / "simulations"
             df = generate_metrics_table(successful_files)
             if not df.empty:
                 csv_path = output_dir / "benchmark_results.csv"
