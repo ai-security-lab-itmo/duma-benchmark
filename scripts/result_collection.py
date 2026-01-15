@@ -8,10 +8,12 @@ and generate comprehensive dataframes for analysis.
 import json
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
+from scipy import stats
+from scipy.stats import binom
 
 from tau2.data_model.simulation import MultiDomainResults, Results
 from tau2.metrics.agent_metrics import is_successful, pass_hat_k
@@ -118,6 +120,12 @@ def compute_task_metrics(results: Results, task_id: str) -> Dict[str, Any]:
         for k in range(1, min(num_trials + 1, 5)):  # Compute pass^1 to pass^4
             if num_trials >= k:
                 metrics[f"pass^{k}"] = float(pass_hat_k(num_trials, success_count, k))
+        
+        # Compute statistical significance metrics for pass@1
+        stats = compute_statistical_significance(success_count, num_trials, method='wilson')
+        metrics['pass^1_ci_lower'] = stats['ci_lower']
+        metrics['pass^1_ci_upper'] = stats['ci_upper']
+        metrics['pass^1_proportion'] = stats['proportion']
 
     return metrics
 
@@ -262,4 +270,223 @@ def visualize_metrics(
         print(df.to_string(index=False))
 
     return df
+
+
+def wilson_confidence_interval(successes: int, trials: int, confidence: float = 0.95) -> Tuple[float, float]:
+    """
+    Calculate Wilson confidence interval for binomial proportion.
+    
+    Suitable for small sample sizes (n >= 3). The Wilson interval performs
+    better than normal approximation for small samples and is more accurate
+    than Clopper-Pearson for small n.
+    
+    Args:
+        successes: Number of successful trials
+        trials: Total number of trials
+        confidence: Confidence level (default 0.95 for 95% CI)
+    
+    Returns:
+        Tuple of (lower_bound, upper_bound)
+    """
+    if trials == 0:
+        return (0.0, 0.0)
+    
+    z = stats.norm.ppf((1 + confidence) / 2)  # z-score for confidence level
+    p_hat = successes / trials
+    
+    denominator = 1 + (z**2 / trials)
+    center = (p_hat + (z**2 / (2 * trials))) / denominator
+    margin = (z / denominator) * np.sqrt((p_hat * (1 - p_hat) / trials) + (z**2 / (4 * trials**2)))
+    
+    lower = max(0.0, center - margin)
+    upper = min(1.0, center + margin)
+    
+    return (lower, upper)
+
+
+def fisher_exact_test(group1_successes: int, group1_trials: int, 
+                     group2_successes: int, group2_trials: int) -> Tuple[float, str]:
+    """
+    Perform Fisher's exact test to compare two binomial proportions.
+    
+    Suitable for small sample sizes. More appropriate than chi-square for n < 20.
+    
+    Args:
+        group1_successes: Number of successes in group 1
+        group1_trials: Total trials in group 1
+        group2_successes: Number of successes in group 2
+        group2_trials: Total trials in group 2
+    
+    Returns:
+        Tuple of (p-value, significance_level) where significance_level is:
+        '***' for p < 0.001, '**' for p < 0.01, '*' for p < 0.05, '' otherwise
+    """
+    group1_failures = group1_trials - group1_successes
+    group2_failures = group2_trials - group2_successes
+    
+    contingency_table = [[group1_successes, group1_failures],
+                        [group2_successes, group2_failures]]
+    
+    try:
+        _, p_value = stats.fisher_exact(contingency_table, alternative='two-sided')
+    except ValueError:
+        # Edge case handling
+        if group1_successes == group2_successes == 0 or \
+           group1_failures == group2_failures == 0:
+            p_value = 1.0
+        else:
+            p_value = 1.0
+    
+    # Determine significance level
+    if p_value < 0.001:
+        sig_level = '***'
+    elif p_value < 0.01:
+        sig_level = '**'
+    elif p_value < 0.05:
+        sig_level = '*'
+    else:
+        sig_level = ''
+    
+    return (p_value, sig_level)
+
+
+def bootstrap_confidence_interval(
+    successes: int, 
+    trials: int, 
+    confidence: float = 0.95,
+    n_bootstrap: int = 10000
+) -> Tuple[float, float]:
+    """
+    Calculate bootstrap confidence interval for binomial proportion.
+    
+    Alternative method for small samples using resampling.
+    
+    Args:
+        successes: Number of successful trials
+        trials: Total number of trials
+        confidence: Confidence level (default 0.95)
+        n_bootstrap: Number of bootstrap samples
+    
+    Returns:
+        Tuple of (lower_bound, upper_bound)
+    """
+    if trials == 0:
+        return (0.0, 0.0)
+    
+    # Create original data
+    data = [1] * successes + [0] * (trials - successes)
+    
+    # Bootstrap resampling
+    bootstrap_samples = []
+    for _ in range(n_bootstrap):
+        sample = np.random.choice(data, size=trials, replace=True)
+        bootstrap_samples.append(np.mean(sample))
+    
+    # Calculate confidence interval
+    alpha = 1 - confidence
+    lower = np.percentile(bootstrap_samples, 100 * alpha / 2)
+    upper = np.percentile(bootstrap_samples, 100 * (1 - alpha / 2))
+    
+    return (max(0.0, lower), min(1.0, upper))
+
+
+def compute_statistical_significance(
+    successes: int,
+    trials: int,
+    reference_successes: Optional[int] = None,
+    reference_trials: Optional[int] = None,
+    method: str = 'wilson'
+) -> Dict[str, Any]:
+    """
+    Compute statistical significance metrics for binomial proportion.
+    
+    Args:
+        successes: Number of successful trials
+        trials: Total number of trials
+        reference_successes: Number of successes in reference group (for comparison)
+        reference_trials: Total trials in reference group (for comparison)
+        method: Method for CI calculation ('wilson' or 'bootstrap')
+    
+    Returns:
+        Dictionary with:
+        - proportion: success rate
+        - ci_lower: lower bound of confidence interval
+        - ci_upper: upper bound of confidence interval
+        - p_value: p-value from Fisher's exact test (if reference provided)
+        - significance: significance level ('***', '**', '*', '')
+    """
+    if trials == 0:
+        return {
+            'proportion': 0.0,
+            'ci_lower': 0.0,
+            'ci_upper': 0.0,
+            'p_value': None,
+            'significance': ''
+        }
+    
+    proportion = successes / trials
+    
+    # Calculate confidence interval
+    if method == 'bootstrap':
+        ci_lower, ci_upper = bootstrap_confidence_interval(successes, trials)
+    else:  # Default to Wilson
+        ci_lower, ci_upper = wilson_confidence_interval(successes, trials)
+    
+    result = {
+        'proportion': proportion,
+        'ci_lower': ci_lower,
+        'ci_upper': ci_upper,
+        'p_value': None,
+        'significance': ''
+    }
+    
+    # Compare with reference if provided
+    if reference_successes is not None and reference_trials is not None:
+        p_value, significance = fisher_exact_test(
+            successes, trials,
+            reference_successes, reference_trials
+        )
+        result['p_value'] = p_value
+        result['significance'] = significance
+    
+    return result
+
+
+def format_pass_k_with_ci(
+    successes: int,
+    trials: int,
+    method: str = 'wilson',
+    significance: str = ''
+) -> str:
+    """
+    Format pass@k metric with confidence interval for LaTeX tables.
+    
+    Args:
+        successes: Number of successful trials
+        trials: Total number of trials
+        method: Method for CI calculation
+        significance: Significance level to append
+    
+    Returns:
+        Formatted string like "3/6 (50%) [CI: 18%--82%]***"
+    """
+    if trials == 0:
+        return "0/0 (0%)"
+    
+    proportion = successes / trials
+    ci_lower, ci_upper = wilson_confidence_interval(successes, trials) if method == 'wilson' \
+                        else bootstrap_confidence_interval(successes, trials)
+    
+    # Format as percentage
+    pct_str = f"{proportion:.0%}" if proportion < 0.01 or proportion > 0.99 else f"{proportion:.1%}"
+    
+    # Format CI
+    ci_lower_pct = f"{ci_lower:.0%}" if ci_lower < 0.01 or ci_lower > 0.99 else f"{ci_lower:.1%}"
+    ci_upper_pct = f"{ci_upper:.0%}" if ci_upper < 0.01 or ci_upper > 0.99 else f"{ci_upper:.1%}"
+    
+    result = f"{successes}/{trials} ({pct_str}) [CI: {ci_lower_pct}--{ci_upper_pct}]"
+    if significance:
+        result += significance
+    
+    return result
 
