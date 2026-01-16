@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import csv
+import json
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -217,39 +218,53 @@ def main(
                     current_file = sim_files[file_num - 1].name
                     file_path = sim_files[file_num - 1]
                     
-                    # Try to load as MultiDomainResults first
-                    try:
-                        multi_domain_results = MultiDomainResults.load(file_path)
-                        # If successful, let user select domain
-                        if multi_domain_results.domains:
-                            ConsoleDisplay.console.print(
-                                f"\n[bold green]Loaded multi-domain results with {len(multi_domain_results.domains)} domains[/]"
-                            )
-                            ConsoleDisplay.console.print("\n[bold blue]Available Domains:[/]")
-                            domain_list = list(multi_domain_results.domains.keys())
-                            for i, domain_name in enumerate(domain_list, 1):
-                                domain_results = multi_domain_results.domains[domain_name]
+                    # Check file structure to determine format
+                    with open(file_path, "r") as f:
+                        file_data = json.load(f)
+                    
+                    # Try to load as MultiDomainResults if "domains" key exists
+                    if "domains" in file_data and file_data.get("domains"):
+                        try:
+                            multi_domain_results = MultiDomainResults.load(file_path)
+                            # If successful, let user select domain
+                            if multi_domain_results.domains:
                                 ConsoleDisplay.console.print(
-                                    f"[cyan]{i}.[/] {domain_name} ({len(domain_results.simulations)} simulations)"
+                                    f"\n[bold green]Loaded multi-domain results with {len(multi_domain_results.domains)} domains[/]"
                                 )
-                            
-                            domain_num = IntPrompt.ask(
-                                f"\nSelect domain number (1-{len(domain_list)})", default=1
-                            )
-                            if 1 <= domain_num <= len(domain_list):
-                                selected_domain = domain_list[domain_num - 1]
-                                results = multi_domain_results.domains[selected_domain]
-                                ConsoleDisplay.console.print(
-                                    f"\n[bold green]Loaded {len(results.simulations)} simulations from domain '{selected_domain}'[/]"
+                                ConsoleDisplay.console.print("\n[bold blue]Available Domains:[/]")
+                                domain_list = list(multi_domain_results.domains.keys())
+                                for i, domain_name in enumerate(domain_list, 1):
+                                    domain_results = multi_domain_results.domains[domain_name]
+                                    ConsoleDisplay.console.print(
+                                        f"[cyan]{i}.[/] {domain_name} ({len(domain_results.simulations)} simulations)"
+                                    )
+                                
+                                domain_num = IntPrompt.ask(
+                                    f"\nSelect domain number (1-{len(domain_list)})", default=1
                                 )
+                                if 1 <= domain_num <= len(domain_list):
+                                    selected_domain = domain_list[domain_num - 1]
+                                    results = multi_domain_results.domains[selected_domain]
+                                    ConsoleDisplay.console.print(
+                                        f"\n[bold green]Loaded {len(results.simulations)} simulations from domain '{selected_domain}'[/]"
+                                    )
+                                else:
+                                    ConsoleDisplay.console.print("[red]Invalid domain number[/]")
+                                    continue
                             else:
-                                ConsoleDisplay.console.print("[red]Invalid domain number[/]")
-                                continue
-                        else:
-                            ConsoleDisplay.console.print("[red]No domains found in file[/]")
-                            continue
-                    except Exception:
-                        # Fall back to single-domain Results format
+                                # Fall through to single-domain format
+                                results = Results.load(file_path)
+                                ConsoleDisplay.console.print(
+                                    f"\n[bold green]Loaded {len(results.simulations)} simulations from {current_file}[/]"
+                                )
+                        except Exception as e:
+                            # If MultiDomainResults load fails, try single-domain
+                            results = Results.load(file_path)
+                            ConsoleDisplay.console.print(
+                                f"\n[bold green]Loaded {len(results.simulations)} simulations from {current_file}[/]"
+                            )
+                    else:
+                        # Load as single-domain Results format
                         results = Results.load(file_path)
                         ConsoleDisplay.console.print(
                             f"\n[bold green]Loaded {len(results.simulations)} simulations from {current_file}[/]"

@@ -101,7 +101,11 @@ def add_run_args(parser):
         "--api-key-env",
         type=str,
         default=None,
-        help="Environment variable name for the LLM API key (defaults to OPENAI_API_KEY if set).",
+        help=(
+            "Environment variable name for the LLM API key. "
+            "Defaults to provider-specific values (e.g., OPENROUTER_API_KEY for openrouter/*, "
+            "OPENAI_API_KEY otherwise)."
+        ),
     )
     parser.add_argument(
         "--local-models",
@@ -177,7 +181,23 @@ def add_run_args(parser):
     )
 
 
-def _build_llm_args(base_args: dict, base_url: str | None, api_key_env: str | None, use_local: bool) -> dict:
+def _default_api_key_env_for_model(model: str | None) -> str:
+    if not model:
+        return "OPENAI_API_KEY"
+    if model.startswith("openrouter/"):
+        return "OPENROUTER_API_KEY"
+    if model.startswith("huggingface/"):
+        return "HUGGINGFACE_API_KEY"
+    return "OPENAI_API_KEY"
+
+
+def _build_llm_args(
+    model: str | None,
+    base_args: dict,
+    base_url: str | None,
+    api_key_env: str | None,
+    use_local: bool,
+) -> dict:
     """Merge base args with optional api_base and api_key injection.
 
     If use_local is True, api_key/api_base are stripped to support local providers.
@@ -191,7 +211,7 @@ def _build_llm_args(base_args: dict, base_url: str | None, api_key_env: str | No
     if base_url:
         args["api_base"] = base_url
 
-    env_name = api_key_env or "OPENAI_API_KEY"
+    env_name = api_key_env or _default_api_key_env_for_model(model)
     api_key = os.getenv(env_name)
     if api_key:
         args.setdefault("api_key", api_key)
@@ -206,9 +226,7 @@ def main():
     # Run command
     run_parser = subparsers.add_parser("run", help="Run a benchmark")
     add_run_args(run_parser)
-    run_parser.set_defaults(
-        func=lambda args: run_command(args)
-    )
+    run_parser.set_defaults(func=lambda args: run_command(args))
 
     # View command
     view_parser = subparsers.add_parser("view", help="View simulation results")
@@ -340,14 +358,23 @@ def main():
 def run_command(args):
     """Run command handler that supports both single and multi-domain runs."""
     agent_llm_args = _build_llm_args(
-        args.agent_llm_args, args.agent_base_url, args.api_key_env, args.local_models
+        args.agent_llm,
+        args.agent_llm_args,
+        args.agent_base_url,
+        args.api_key_env,
+        args.local_models,
     )
     user_llm_args = _build_llm_args(
-        args.user_llm_args, args.user_base_url, args.api_key_env, args.local_models
+        args.user_llm,
+        args.user_llm_args,
+        args.user_base_url,
+        args.api_key_env,
+        args.local_models,
     )
 
     config = RunConfig(
         domain=args.domain or "",  # Will be ignored if domains is provided
+        is_remote=False,
         task_set_name=args.task_set_name,
         task_ids=args.task_ids,
         num_tasks=args.num_tasks,
@@ -367,13 +394,15 @@ def run_command(args):
         seed=args.seed,
         log_level=args.log_level,
     )
-    
+
     available_domains = get_options().domains
 
     if args.domains:
         # Multi-domain run
         if args.domain:
-            raise ValueError("Cannot use both --domain and --domains. Use --domains for multiple domains.")
+            raise ValueError(
+                "Cannot use both --domain and --domains. Use --domains for multiple domains."
+            )
         domains = available_domains if "all" in args.domains else args.domains
         return run_domains(domains=domains, config=config)
     else:

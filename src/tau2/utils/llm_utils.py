@@ -212,11 +212,59 @@ def generate(
         # - Map HF_TOKEN -> HUGGINGFACE_API_KEY env var if not already set
         # - Provide a sensible default api_base if none was passed
         if isinstance(model, str) and model.startswith("huggingface/"):
-            if os.getenv("HUGGINGFACE_API_KEY") is None and os.getenv("HF_TOKEN") is not None:
+            if (
+                os.getenv("HUGGINGFACE_API_KEY") is None
+                and os.getenv("HF_TOKEN") is not None
+            ):
                 os.environ["HUGGINGFACE_API_KEY"] = os.getenv("HF_TOKEN")  # for litellm
             if "api_base" not in kwargs or not kwargs.get("api_base"):
                 # Default to the HF router OpenAI-compatible endpoint
                 kwargs["api_base"] = "https://router.huggingface.co/v1"
+
+        # OpenRouter support (OpenAI-compatible endpoint + model catalog at https://openrouter.ai/models)
+        #
+        # This repo often runs with OPENROUTER_API_KEY, but some internal models
+        # (e.g. output evaluator) might still be configured as "gpt-4o-mini".
+        # If we detect an OpenRouter key (sk-or-...), route ALL such requests to
+        # OpenRouter and normalize model names.
+        openrouter_key = os.getenv("OPENROUTER_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+        openrouter_mode = (
+            (isinstance(openrouter_key, str) and openrouter_key.startswith("sk-or-"))
+            or (isinstance(openai_key, str) and openai_key.startswith("sk-or-"))
+            or (
+                isinstance(kwargs.get("api_key"), str)
+                and kwargs.get("api_key").startswith("sk-or-")
+            )
+        )
+
+        if openrouter_mode or (isinstance(model, str) and model.startswith("openrouter/")):
+            # Convenience: allow reusing OPENAI_API_KEY as OPENROUTER_API_KEY.
+            if (
+                os.getenv("OPENROUTER_API_KEY") is None
+                and os.getenv("OPENAI_API_KEY") is not None
+            ):
+                os.environ["OPENROUTER_API_KEY"] = os.getenv("OPENAI_API_KEY")
+
+            if "api_base" not in kwargs or not kwargs.get("api_base"):
+                kwargs["api_base"] = "https://openrouter.ai/api/v1"
+
+            # Normalize model name for OpenRouter endpoint:
+            # - "openrouter/openai/gpt-4o" -> "openai/gpt-4o"
+            # - "gpt-4o-mini" -> "openai/gpt-4o-mini"
+            if isinstance(model, str):
+                if model.startswith("openrouter/"):
+                    model = model.replace("openrouter/", "", 1)
+                elif "/" not in model:
+                    model = f"openai/{model}"
+
+            extra_headers = dict(kwargs.get("extra_headers") or {})
+            # Optional but recommended by OpenRouter
+            extra_headers.setdefault("X-Title", os.getenv("OPENROUTER_APP_NAME", "tau2"))
+            referer = os.getenv("OPENROUTER_HTTP_REFERER")
+            if referer:
+                extra_headers.setdefault("HTTP-Referer", referer)
+            kwargs["extra_headers"] = extra_headers
 
         response = completion(
             model=model,
