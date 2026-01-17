@@ -135,6 +135,7 @@ def run_all_experiments(
     output_dir: Optional[Path] = None,  # Не используется, оставлено для совместимости
     parallel_experiments: int = 4,  # Количество параллельных экспериментов
     force_rerun: bool = False,  # Принудительно перезапустить все эксперименты
+    user_llm: Optional[str] = None,  # Модель для симуляции пользователя
 ) -> Path:
     """
     Запустить все эксперименты.
@@ -225,7 +226,10 @@ def run_all_experiments(
                 for task in tasks:
                     # Формируем имя файла без расширения (tau2 добавит .json автоматически)
                     model_id = _model_id_for_results(model)
-                    file_name = f"paper_results_{domain}_{_sanitize_model_for_filename(model_id)}_T{temp}_{task}"
+                    # Определяем модель пользователя
+                    effective_user_llm = user_llm if user_llm else model
+                    user_model_id = _model_id_for_results(effective_user_llm)
+                    file_name = f"paper_results_{domain}_{_sanitize_model_for_filename(model_id)}_U{_sanitize_model_for_filename(user_model_id)}_T{temp}_{task}"
                     # Фактический путь к файлу результата
                     output_file = actual_output_dir / f"{file_name}.json"
 
@@ -238,7 +242,7 @@ def run_all_experiments(
                         "--agent-llm",
                         model,
                         "--user-llm",
-                        model,
+                        effective_user_llm,
                         "--user-llm-args",
                         json.dumps({"temperature": temp}),
                         "--num-trials",
@@ -1316,7 +1320,13 @@ def main():
         "--models",
         nargs="+",
         default=["gpt-4o", "gpt-4o-mini", "gpt-5.1", "gpt-5.2"],
-        help="Модели для тестирования",
+        help="Модели агента для тестирования",
+    )
+    parser.add_argument(
+        "--user-llm",
+        type=str,
+        default=None,
+        help="Модель для симуляции пользователя (по умолчанию: такая же как agent)",
     )
     parser.add_argument(
         "--temperatures",
@@ -1405,6 +1415,7 @@ def main():
             args.max_concurrency,
             args.results_dir,
             force_rerun=args.force_rerun,
+            user_llm=args.user_llm,
         )
     else:
         print("Пропуск запуска экспериментов (--skip-experiments)")
@@ -1473,9 +1484,13 @@ def main():
         for model in args.models:
             model_id = _model_id_for_results(model)
             file_model = _sanitize_model_for_filename(model_id)
+            # Определяем модель пользователя
+            effective_user_llm = args.user_llm if args.user_llm else model
+            user_model_id = _model_id_for_results(effective_user_llm)
+            file_user_model = _sanitize_model_for_filename(user_model_id)
             for temp in args.temperatures:
                 for task_id in domain_tasks:
-                    stem = f"paper_results_{domain}_{file_model}_T{temp}_{task_id}"
+                    stem = f"paper_results_{domain}_{file_model}_U{file_user_model}_T{temp}_{task_id}"
                     expected_files.append((results_dir / f"{stem}.json", task_id))
 
     missing_or_incomplete: list[str] = []
