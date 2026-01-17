@@ -35,9 +35,19 @@ class ActionEvaluator(EvaluatorBase):
 
         action_checks = cls.evaluate_actions(full_trajectory, golden_actions)
 
-        # Calculate reward: 1 if all expectations are met, 0 otherwise
-        all_expectations_met = all(result.action_match for result in action_checks)
-        reward = 1.0 if all_expectations_met else 0.0
+        # Separate critical and non-critical actions
+        critical_checks = [r for r in action_checks if r.action.critical]
+        non_critical_checks = [r for r in action_checks if not r.action.critical]
+
+        # If any critical action failed, reward is 0
+        if critical_checks and not all(r.action_match for r in critical_checks):
+            reward = 0.0
+        else:
+            # Non-critical actions contribute proportionally
+            if non_critical_checks:
+                reward = sum(r.action_reward for r in non_critical_checks) / len(non_critical_checks)
+            else:
+                reward = 1.0
 
         return RewardInfo(
             reward=reward,
