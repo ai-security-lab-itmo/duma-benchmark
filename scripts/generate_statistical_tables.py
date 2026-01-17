@@ -358,6 +358,14 @@ def _short_model_label(model: str) -> str:
     return model
 
 
+def format_pass_k_value(pass_k: float, k: int) -> str:
+    """Format pass^k value as percentage for LaTeX."""
+    if pass_k is None:
+        return "N/A"
+    pct = pass_k * 100
+    return f"{pct:.1f}\\%"
+
+
 def generate_detailed_metrics_table_latex(
     result_files: List[Path],
     domains: List[str],
@@ -365,17 +373,17 @@ def generate_detailed_metrics_table_latex(
 ) -> str:
     """
     Generate LaTeX table with detailed metrics for each task.
-    
+
     Args:
         result_files: List of result file paths
         domains: List of domain names
         output_path: Optional path to save the table
-    
+
     Returns:
         LaTeX table code as string
     """
     rows = []
-    
+
     # Process each domain
     for domain in domains:
         # Load all results for this domain
@@ -388,10 +396,10 @@ def generate_detailed_metrics_table_latex(
             except Exception as e:
                 print(f"Warning: Failed to load {file_path}: {e}")
                 continue
-        
+
         if not domain_results:
             continue
-        
+
         # Process each result configuration
         for results in domain_results:
             model = _normalize_model_name(results.info.agent_info.llm)
@@ -401,17 +409,17 @@ def generate_detailed_metrics_table_latex(
                 if results.info.user_info.llm_args
                 else 0.0
             )
-            
+
             task_ids = set(sim.task_id for sim in results.simulations)
-            
+
             for task_id in task_ids:
                 # Create temporary Results object for this task only
                 task_sims = [deepcopy(s) for s in results.simulations if s.task_id == task_id]
                 task_tasks = [deepcopy(t) for t in results.tasks if t.id == task_id]
-                
+
                 if not task_sims:
                     continue
-                
+
                 # Create temporary Results for metric computation
                 temp_results = Results(
                     timestamp=results.timestamp,
@@ -419,40 +427,48 @@ def generate_detailed_metrics_table_latex(
                     tasks=task_tasks,
                     simulations=task_sims
                 )
-                
+
                 metrics = compute_task_metrics(temp_results, task_id)
                 if not metrics:
                     continue
-                
+
                 # Format metrics
                 pass1_str = format_pass_k_with_ci(
                     metrics.get('success_count', 0),
                     metrics.get('num_trials', 0),
                     significance=''
                 )
-                
+
+                # Format pass^2, pass^3, pass^4
+                pass2_str = format_pass_k_value(metrics.get('pass^2'), 2)
+                pass3_str = format_pass_k_value(metrics.get('pass^3'), 3)
+                pass4_str = format_pass_k_value(metrics.get('pass^4'), 4)
+
                 asr_str = format_asr_with_ci(
                     metrics.get('success_count', 0),
                     metrics.get('num_trials', 0),
                     significance=''
                 )
-                
+
                 # Continuous metrics
                 task_sims_raw = [s for s in results.simulations if s.task_id == task_id]
                 rewards_raw = [s.reward_info.reward if s.reward_info else 0.0 for s in task_sims_raw]
                 durations_raw = [float(s.duration) for s in task_sims_raw]
                 num_messages_raw = [float(len(s.messages)) for s in task_sims_raw]
-                
+
                 reward_str = format_continuous_metric_with_ci(rewards_raw, 'reward', '') if rewards_raw else "N/A"
                 duration_str = format_continuous_metric_with_ci(durations_raw, 'duration', '') if durations_raw else "N/A"
                 num_messages_str = format_continuous_metric_with_ci(num_messages_raw, 'num_messages', '') if num_messages_raw else "N/A"
-                
+
                 rows.append({
                     'domain': domain,
                     'model': model,
                     'temp': temp,
                     'task': task_id,
                     'pass1': pass1_str,
+                    'pass2': pass2_str,
+                    'pass3': pass3_str,
+                    'pass4': pass4_str,
                     'asr': asr_str,
                     'avg_reward': reward_str,
                     'avg_duration': duration_str,
@@ -462,29 +478,30 @@ def generate_detailed_metrics_table_latex(
     # Generate LaTeX table
     # Используем более компактные колонки и landscape для широкой таблицы
     # Уменьшаем шрифт и ширину колонок для лучшего размещения
+    # 12 колонок: домен, модель, T, кейс, pass@1, pass@2, pass@3, pass@4, ASR, reward, duration, msgs
     latex_lines = [
         "\\begin{landscape}",
         "\\scriptsize",
-        "\\setlength{\\tabcolsep}{3pt}",
+        "\\setlength{\\tabcolsep}{2pt}",
         "\\renewcommand{\\arraystretch}{1.1}",
-        "\\begin{longtable}{p{2.2cm}p{1.5cm}p{0.5cm}p{2.3cm}p{2.4cm}p{2.0cm}p{1.7cm}p{1.6cm}p{1.5cm}}",
+        "\\begin{longtable}{p{1.8cm}p{1.2cm}p{0.4cm}p{2.0cm}p{2.2cm}p{0.8cm}p{0.8cm}p{0.8cm}p{1.8cm}p{1.5cm}p{1.3cm}p{1.0cm}}",
         "\\caption{Детальные метрики по кейсам} \\label{tab:detailed_metrics} \\\\",
         "\\toprule",
-        "\\shortstack{\\textbf{Домен}} & \\shortstack{\\textbf{Модель}} & \\textbf{T} & \\textbf{Кейс} & \\textbf{pass@1} & \\textbf{ASR} & \\shortstack{\\textbf{avg}\\\\\\textbf{reward}} & \\shortstack{\\textbf{duration}\\\\\\textbf{(s)}} & \\shortstack{\\textbf{num}\\\\\\textbf{msgs}} \\\\",
+        "\\shortstack{\\textbf{Домен}} & \\shortstack{\\textbf{Модель}} & \\textbf{T} & \\textbf{Кейс} & \\textbf{pass@1} & \\textbf{p@2} & \\textbf{p@3} & \\textbf{p@4} & \\textbf{ASR} & \\shortstack{\\textbf{avg}\\\\\\textbf{reward}} & \\shortstack{\\textbf{dur}\\\\\\textbf{(s)}} & \\shortstack{\\textbf{num}\\\\\\textbf{msg}} \\\\",
         "\\midrule",
         "\\endfirsthead",
-        "\\multicolumn{9}{c}{\\tablename\\ \\thetable{} -- продолжение} \\\\",
+        "\\multicolumn{12}{c}{\\tablename\\ \\thetable{} -- продолжение} \\\\",
         "\\toprule",
-        "\\shortstack{\\textbf{Домен}} & \\shortstack{\\textbf{Модель}} & \\textbf{T} & \\textbf{Кейс} & \\textbf{pass@1} & \\textbf{ASR} & \\shortstack{\\textbf{avg}\\\\\\textbf{reward}} & \\shortstack{\\textbf{duration}\\\\\\textbf{(s)}} & \\shortstack{\\textbf{num}\\\\\\textbf{msgs}} \\\\",
+        "\\shortstack{\\textbf{Домен}} & \\shortstack{\\textbf{Модель}} & \\textbf{T} & \\textbf{Кейс} & \\textbf{pass@1} & \\textbf{p@2} & \\textbf{p@3} & \\textbf{p@4} & \\textbf{ASR} & \\shortstack{\\textbf{avg}\\\\\\textbf{reward}} & \\shortstack{\\textbf{dur}\\\\\\textbf{(s)}} & \\shortstack{\\textbf{num}\\\\\\textbf{msg}} \\\\",
         "\\midrule",
         "\\endhead",
         "\\midrule",
-        "\\multicolumn{9}{r}{Продолжение на следующей странице} \\\\",
+        "\\multicolumn{12}{r}{Продолжение на следующей странице} \\\\",
         "\\endfoot",
         "\\bottomrule",
         "\\endlastfoot",
     ]
-    
+
     for row in rows:
         # Экранировать все текстовые поля
         domain_escaped = escape_latex(_short_domain_label(row['domain']))
@@ -502,10 +519,13 @@ def generate_detailed_metrics_table_latex(
             task_escaped = "\\shortstack{" + "\\\\".join(chunks) + "}"
         else:
             task_escaped = escape_latex(task_short)
-        
+
         # Экранировать значения метрик, которые могут содержать спецсимволы
         # Но не экранируем уже отформатированные строки с CI, так как они уже содержат правильное форматирование
         pass1_val = row['pass1']  # Уже отформатировано с escape
+        pass2_val = row['pass2']  # Уже отформатировано
+        pass3_val = row['pass3']  # Уже отформатировано
+        pass4_val = row['pass4']  # Уже отформатировано
         asr_val = row['asr']  # Уже отформатировано
         avg_reward_val = row['avg_reward']  # Уже отформатировано
         avg_duration_val = row['avg_duration']  # Уже отформатировано
@@ -529,8 +549,8 @@ def generate_detailed_metrics_table_latex(
 
         latex_lines.append(
             f"{domain_escaped} & {model_escaped} & {row['temp']} & {task_escaped} & "
-            f"{pass1_val} & {asr_val} & {avg_reward_val} & "
-            f"{avg_duration_val} & {avg_num_messages_val} \\\\" 
+            f"{pass1_val} & {pass2_val} & {pass3_val} & {pass4_val} & {asr_val} & {avg_reward_val} & "
+            f"{avg_duration_val} & {avg_num_messages_val} \\\\"
         )
 
     
@@ -693,6 +713,75 @@ def _format_p_value_scientific(p_value: float) -> str:
     return f"{p_value:.2e}"
 
 
+def _aggregate_pass_k_by_domain(
+    result_files: List[Path],
+    *,
+    domain: str,
+    model: str,
+    temperature: float,
+    k_values: List[int] = [1, 2, 3, 4],
+) -> Dict[int, Optional[float]]:
+    """Aggregate pass^k metrics across all tasks in domain for config.
+
+    Returns dict mapping k -> average pass^k (or None if not enough trials).
+    """
+    from tau2.metrics.agent_metrics import pass_hat_k
+
+    norm_model = _normalize_model_name(model)
+
+    # Collect pass^k values per task
+    pass_k_values: Dict[int, List[float]] = {k: [] for k in k_values}
+
+    for file_path in result_files:
+        try:
+            domains_dict = load_simulation_file(file_path)
+        except Exception:
+            continue
+
+        if domain not in domains_dict:
+            continue
+
+        results = domains_dict[domain]
+        results_model = _normalize_model_name(results.info.agent_info.llm)
+        results_temp = (
+            float(results.info.user_info.llm_args.get("temperature", 0.0))
+            if results.info.user_info.llm_args
+            else 0.0
+        )
+
+        if results_model != norm_model:
+            continue
+        if results_temp != float(temperature):
+            continue
+
+        task_ids = {sim.task_id for sim in results.simulations}
+        for task_id in task_ids:
+            metrics = compute_task_metrics(results, task_id)
+            if not metrics:
+                continue
+
+            num_trials = metrics.get("num_trials", 0)
+            success_count = metrics.get("success_count", 0)
+
+            for k in k_values:
+                if num_trials >= k:
+                    try:
+                        pk = pass_hat_k(num_trials, success_count, k)
+                        pass_k_values[k].append(pk)
+                    except (ValueError, ZeroDivisionError):
+                        pass
+
+    # Compute averages
+    result: Dict[int, Optional[float]] = {}
+    for k in k_values:
+        if pass_k_values[k]:
+            result[k] = float(np.mean(pass_k_values[k]))
+        else:
+            result[k] = None
+
+    return result
+
+
 def generate_model_domain_table_latex(
     result_files: List[Path],
     domains: List[str],
@@ -700,41 +789,77 @@ def generate_model_domain_table_latex(
     temperatures: List[float],
     output_path: Optional[Path] = None,
 ) -> str:
-    """Generate model×domain pass@1 table (aggregated across tasks)."""
+    """Generate model×domain pass@k table (aggregated across tasks)."""
 
-    header_domains = [escape_latex(d) for d in domains]
+    # Build table with pass@1, pass@2, pass@3, pass@4 for each domain
+    # Each domain has 4 columns (p@1, p@2, p@3, p@4)
+    k_values = [1, 2, 3, 4]
 
+    # Header: Model | domain1 (p@1 p@2 p@3 p@4) | domain2 (...) | ...
     latex_lines = [
         "\\begin{table}[htbp]",
         "\\centering",
-        "\\caption{Сравнение устойчивости моделей по доменам (pass@1)}",
+        "\\scriptsize",
+        "\\setlength{\\tabcolsep}{2pt}",
+        "\\renewcommand{\\arraystretch}{1.1}",
+        "\\caption{Сравнение устойчивости моделей по доменам (pass@k, \\%)}",
         "\\label{tab:aggregated}",
-        "\\begin{tabular}{l" + "c" * len(domains) + "}",
-        "\\toprule",
-        "\\textbf{Модель} & "
-        + " & ".join(f"\\textbf{{{d}}}" for d in header_domains)
-        + " \\\\",
-        "\\midrule",
     ]
 
-    # Ensure stable ordering
+    # Build column spec: l for model, then 4 columns per domain
+    col_spec = "l" + "c" * (len(domains) * len(k_values))
+    latex_lines.append(f"\\begin{{tabular}}{{{col_spec}}}")
+    latex_lines.append("\\toprule")
+
+    # Multi-row header
+    # First row: Model | Domain1 (spanning 4 cols) | Domain2 (spanning 4 cols) | ...
+    header_row1 = "\\textbf{Модель}"
+    for domain in domains:
+        domain_escaped = escape_latex(_short_domain_label(domain))
+        header_row1 += f" & \\multicolumn{{{len(k_values)}}}{{c}}{{\\textbf{{{domain_escaped}}}}}"
+    header_row1 += " \\\\"
+    latex_lines.append(header_row1)
+
+    # Add cmidrule for each domain
+    cmidrules = []
+    col_start = 2  # First domain starts at column 2
+    for i, domain in enumerate(domains):
+        col_end = col_start + len(k_values) - 1
+        cmidrules.append(f"\\cmidrule(lr){{{col_start}-{col_end}}}")
+        col_start = col_end + 1
+    latex_lines.append(" ".join(cmidrules))
+
+    # Second row: empty | p@1 p@2 p@3 p@4 | p@1 p@2 p@3 p@4 | ...
+    header_row2 = ""
+    for domain in domains:
+        for k in k_values:
+            header_row2 += f" & \\textbf{{p@{k}}}"
+    header_row2 += " \\\\"
+    latex_lines.append(header_row2)
+    latex_lines.append("\\midrule")
+
+    # Data rows
     for model in models:
         m = _normalize_model_name(model)
         for temp in temperatures:
-            row_label = escape_latex(f"{m} (T={temp})")
-            cells: list[str] = []
-            for domain in domains:
-                succ, trials = _aggregate_successes_trials_by_domain(
-                    result_files, domain=domain, model=m, temperature=float(temp)
-                )
-                if trials == 0:
-                    cells.append("N/A")
-                    continue
-                rate = succ / trials
-                pct = (100.0 * rate)
-                cells.append(f"{succ}/{trials} ({pct:.1f}\\%)")
+            row_label = escape_latex(f"{_short_model_label(m)} (T={temp})")
+            cells: list[str] = [row_label]
 
-            latex_lines.append(row_label + " & " + " & ".join(cells) + " \\\\")
+            for domain in domains:
+                pass_k_dict = _aggregate_pass_k_by_domain(
+                    result_files, domain=domain, model=m, temperature=float(temp),
+                    k_values=k_values
+                )
+
+                for k in k_values:
+                    pk = pass_k_dict.get(k)
+                    if pk is not None:
+                        pct = 100.0 * pk
+                        cells.append(f"{pct:.1f}")
+                    else:
+                        cells.append("N/A")
+
+            latex_lines.append(" & ".join(cells) + " \\\\")
 
     latex_lines.extend([
         "\\bottomrule",
@@ -762,6 +887,80 @@ def generate_significance_table_latex(
     output_path: Optional[Path] = None,
 ) -> str:
     """Generate p-value table comparing model_a vs model_b at fixed T."""
+    model_a = _normalize_model_name(model_a)
+    model_b = _normalize_model_name(model_b)
+
+    # Table is wide; keep it compact.
+    latex_lines = [
+        "\\begin{table}[htbp]",
+        "\\centering",
+        "\\scriptsize",
+        "\\setlength{\\tabcolsep}{3pt}",
+        "\\renewcommand{\\arraystretch}{1.1}",
+        "\\caption{Статистическая значимость различий (Fisher exact, двусторонний; p относится к pass@1 и ASR)}",
+        "\\label{tab:significance}",
+        "\\begin{tabular}{llccccc}",
+        "\\toprule",
+        "\\textbf{Домен} & \\textbf{T} & "
+        "\\shortstack{\\textbf{4o}\\\\\\textbf{pass@1}} & "
+        "\\shortstack{\\textbf{4o-mini}\\\\\\textbf{pass@1}} & "
+        "\\shortstack{\\textbf{4o}\\\\\\textbf{ASR}} & "
+        "\\shortstack{\\textbf{4o-mini}\\\\\\textbf{ASR}} & "
+        "\\shortstack{\\textbf{p}} \\\\",
+        "\\midrule",
+    ]
+
+    for domain in domains:
+        domain_tex = escape_latex(domain)
+        for temp in temperatures:
+            succ_a, trials_a = _aggregate_successes_trials_by_domain(
+                result_files, domain=domain, model=model_a, temperature=float(temp)
+            )
+            succ_b, trials_b = _aggregate_successes_trials_by_domain(
+                result_files, domain=domain, model=model_b, temperature=float(temp)
+            )
+
+            # p-value for pass@1 (success vs failure)
+            p_pass, _ = fisher_exact_test(succ_a, trials_a, succ_b, trials_b)
+
+            # ASR = 1 - pass@1, so p-value is the same; we show it once.
+
+            pass_a = succ_a / trials_a if trials_a else 0.0
+            pass_b = succ_b / trials_b if trials_b else 0.0
+            asr_a = 1.0 - pass_a
+            asr_b = 1.0 - pass_b
+
+            # Keep columns narrow (integer percents).
+            pass_a_str = (
+                f"{succ_a}/{trials_a} ({100.0 * pass_a:.0f}\\%)" if trials_a else "N/A"
+            )
+            pass_b_str = (
+                f"{succ_b}/{trials_b} ({100.0 * pass_b:.0f}\\%)" if trials_b else "N/A"
+            )
+            asr_a_str = f"{100.0 * asr_a:.0f}\\%" if trials_a else "N/A"
+            asr_b_str = f"{100.0 * asr_b:.0f}\\%" if trials_b else "N/A"
+
+            p_str = _format_p_value_scientific(float(p_pass))
+
+            latex_lines.append(
+                f"{domain_tex} & {temp:g} & {pass_a_str} & {pass_b_str} & "
+                f"{asr_a_str} & {asr_b_str} & {p_str} \\\\"
+            )
+
+    latex_lines.extend([
+        "\\bottomrule",
+        "\\end{tabular}",
+        "\\end{table}",
+    ])
+
+    latex_code = "\n".join(latex_lines)
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(latex_code)
+        print(f"Significance table saved to {output_path}")
+
+    return latex_code
 
 
 def generate_temperature_significance_table_latex(
@@ -838,81 +1037,6 @@ def generate_temperature_significance_table_latex(
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(latex_code)
         print(f"Temperature significance table saved to {output_path}")
-
-    return latex_code
-
-    model_a = _normalize_model_name(model_a)
-    model_b = _normalize_model_name(model_b)
-
-    # Table is wide; keep it compact.
-    latex_lines = [
-        "\\begin{table}[htbp]",
-        "\\centering",
-        "\\scriptsize",
-        "\\setlength{\\tabcolsep}{3pt}",
-        "\\renewcommand{\\arraystretch}{1.1}",
-        "\\caption{Статистическая значимость различий (Fisher exact, двусторонний; p относится к pass@1 и ASR)}",
-        "\\label{tab:significance}",
-        "\\begin{tabular}{llccccc}",
-        "\\toprule",
-        "\\textbf{Домен} & \\textbf{T} & "
-        "\\shortstack{\\textbf{4o}\\\\\\textbf{pass@1}} & "
-        "\\shortstack{\\textbf{4o-mini}\\\\\\textbf{pass@1}} & "
-        "\\shortstack{\\textbf{4o}\\\\\\textbf{ASR}} & "
-        "\\shortstack{\\textbf{4o-mini}\\\\\\textbf{ASR}} & "
-        "\\shortstack{\\textbf{p}} \\\\",
-        "\\midrule",
-    ]
-
-    for domain in domains:
-        domain_tex = escape_latex(domain)
-        for temp in temperatures:
-            succ_a, trials_a = _aggregate_successes_trials_by_domain(
-                result_files, domain=domain, model=model_a, temperature=float(temp)
-            )
-            succ_b, trials_b = _aggregate_successes_trials_by_domain(
-                result_files, domain=domain, model=model_b, temperature=float(temp)
-            )
-
-            # p-value for pass@1 (success vs failure)
-            p_pass, _ = fisher_exact_test(succ_a, trials_a, succ_b, trials_b)
-
-            # ASR = 1 - pass@1, so p-value is the same; we show it once.
-
-            pass_a = succ_a / trials_a if trials_a else 0.0
-            pass_b = succ_b / trials_b if trials_b else 0.0
-            asr_a = 1.0 - pass_a
-            asr_b = 1.0 - pass_b
-
-            # Keep columns narrow (integer percents).
-            pass_a_str = (
-                f"{succ_a}/{trials_a} ({100.0 * pass_a:.0f}\\%)" if trials_a else "N/A"
-            )
-            pass_b_str = (
-                f"{succ_b}/{trials_b} ({100.0 * pass_b:.0f}\\%)" if trials_b else "N/A"
-            )
-            asr_a_str = f"{100.0 * asr_a:.0f}\\%" if trials_a else "N/A"
-            asr_b_str = f"{100.0 * asr_b:.0f}\\%" if trials_b else "N/A"
-
-            p_str = _format_p_value_scientific(float(p_pass))
-
-            latex_lines.append(
-                f"{domain_tex} & {temp:g} & {pass_a_str} & {pass_b_str} & "
-                f"{asr_a_str} & {asr_b_str} & {p_str} \\\\"
-            )
-
-    latex_lines.extend([
-        "\\bottomrule",
-        "\\end{tabular}",
-        "\\end{table}",
-    ])
-
-    latex_code = "\n".join(latex_lines)
-
-    if output_path:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(latex_code)
-        print(f"Significance table saved to {output_path}")
 
     return latex_code
 
