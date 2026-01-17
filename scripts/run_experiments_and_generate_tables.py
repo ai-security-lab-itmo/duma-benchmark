@@ -253,6 +253,7 @@ def run_all_experiments(
                         file_name,  # Без расширения и пути
                         "--max-concurrency",
                         str(max_concurrency),
+                        "--local-models"
                     ]
                     # Проверка: убедимся, что все аргументы - строки
                     cmd = [str(arg) for arg in cmd]
