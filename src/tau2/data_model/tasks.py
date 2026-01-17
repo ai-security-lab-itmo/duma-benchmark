@@ -144,6 +144,10 @@ class Action(BaseModel):
         description="The arguments to check in tool call. If None, will check all the arguments.",
         default=None,
     )
+    critical: bool = Field(
+        description="If True, failing this action zeros the entire reward. Non-critical actions contribute proportionally.",
+        default=False,
+    )
 
     def __str__(self) -> str:
         lines = []
