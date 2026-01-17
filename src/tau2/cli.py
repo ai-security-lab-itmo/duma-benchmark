@@ -210,6 +210,11 @@ def _build_llm_args(
 
     if base_url:
         args["api_base"] = base_url
+    else:
+        args.setdefault(
+            "api_base",
+            os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
+        )
 
     env_name = api_key_env or _default_api_key_env_for_model(model)
     api_key = os.getenv(env_name)

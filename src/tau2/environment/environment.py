@@ -317,6 +317,11 @@ class Environment:
             for action in initialization_actions:
                 self.run_env_function_call(action)
 
+        if self.tools is not None and hasattr(self.tools, "set_message_history"):
+            self.tools.set_message_history(message_history)
+        if self.user_tools is not None and hasattr(self.user_tools, "set_message_history"):
+            self.user_tools.set_message_history(message_history)
+
         action_responses = get_actions_from_messages(message_history)
         for tool_call, expected_response in action_responses:
             response = self.get_response(tool_call)
