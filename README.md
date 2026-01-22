@@ -6,37 +6,16 @@
 
 
 <div align="center">
-<img src="figs/overview.png" width="95%" alt="System Overview"><br>
-<em>Figure 1: τ²-bench allows users to interact with the agent and the environment</em>
+<img src="figs/attaks.jpg" width="95%" alt="System Overview"><br>
+<em>Figure 1: Duma-bench allows users to interact with the agent and the environment</em>
 </div>
 
 <div align="center">
-<img src="figs/traj.png" width="95%" alt="Trajectory"><br>
+<img src="figs/diagram.jpg" width="95%" alt="Trajectory"><br>
 <em>Figure 2: Trajectory of a conversation between an agent and a user</em>
 </div>
 
 ## 🆕 What's New
-
-<div align="center">
-<img src="figs/new_domains.jpg" width="95%" alt="System Overview"><br>
-<em>Figure 3: New domains built on τ²-bench for testing RAG poisoning, multi-agent interactions and output handling vulnerabilities</em>
-</div>
-
-<p align="center">
-  <img src="figs/collab.jpg" width="48%" alt="Multi-agent Collaboration">
-  &nbsp;&nbsp;
-  <img src="figs/output_handling.jpg" width="48%" alt="Output Handling">
-</p>
-<p align="center">
-  <em>Figure 4: Multi-agent interaction domain &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Figure 5: Output handling domain</em>
-</p>
-
-<p align="center">
-  <img src="figs/rag_poisoning.jpg" width="50%" alt="RAG Poisoning">
-</p>
-<p align="center">
-  <em>Figure 6: RAG poisoning domain</em>
-</p>
 
 ## Overview
 
@@ -264,14 +243,6 @@ tau2 submit verify-trajs data/tau2/simulations/my_model_*.json
 ```
 
 ### Submitting to the Leaderboard
-
-Once your submission package is prepared and validated:
-
-1. Review the generated `submission.json` file
-2. Follow the submission guidelines in [web/leaderboard/public/submissions/README.md](web/leaderboard/public/submissions/README.md) to create a Pull Request
-3. Keep your `trajectories/` directory for reference
-
-The leaderboard will display your model's Pass^k success rates (k=1,2,3,4) across all domains.
 
 ## Experiments
 
