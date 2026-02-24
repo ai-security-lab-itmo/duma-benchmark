@@ -135,11 +135,14 @@ def to_tau2_messages(
     return tau2_messages
 
 
-def to_litellm_messages(messages: list[Message]) -> list[dict]:
+def to_litellm_messages(messages: list[Message], model: Optional[str] = None) -> list[dict]:
     """
     Convert a list of Tau2 messages to a list of litellm messages.
     """
     litellm_messages = []
+    # Check if we're using GigaChat (requires JSON tool responses)
+    is_gigachat = isinstance(model, str) and model.startswith("gigachat/")
+
     for message in messages:
         if isinstance(message, UserMessage):
             litellm_messages.append({"role": "user", "content": message.content})
@@ -166,10 +169,21 @@ def to_litellm_messages(messages: list[Message]) -> list[dict]:
                 }
             )
         elif isinstance(message, ToolMessage):
+            # GigaChat requires tool content to be valid JSON
+            tool_content = message.content
+            if is_gigachat:
+                # Wrap plain text responses in JSON object
+                try:
+                    # Try to parse as JSON first (in case it's already valid JSON)
+                    json.loads(tool_content)
+                except (json.JSONDecodeError, TypeError):
+                    # If not valid JSON, wrap it
+                    tool_content = json.dumps({"result": tool_content})
+
             litellm_messages.append(
                 {
                     "role": "tool",
-                    "content": message.content,
+                    "content": tool_content,
                     "tool_call_id": message.id,
                 }
             )
@@ -202,7 +216,7 @@ def generate(
 
     if model.startswith("claude") and not ALLOW_SONNET_THINKING:
         kwargs["thinking"] = {"type": "disabled"}
-    litellm_messages = to_litellm_messages(messages)
+    litellm_messages = to_litellm_messages(messages, model=model)
     tools = [tool.openai_schema for tool in tools] if tools else None
     if tools and tool_choice is None:
         tool_choice = "auto"
@@ -238,8 +252,21 @@ def generate(
             )
         )
 
-        if openrouter_mode or (isinstance(model, str) and model.startswith("openrouter/")):
-            # Convenience: allow reusing OPENAI_API_KEY as OPENROUTER_API_KEY.
+        # OpenRouter routing:
+        # - If model starts with "openrouter/", LiteLLM handles it natively
+        # - If openrouter_mode is detected (sk-or-... key), route non-prefixed models
+        is_explicit_openrouter = isinstance(model, str) and model.startswith("openrouter/")
+        is_gigachat = isinstance(model, str) and model.startswith("gigachat/")
+
+        if is_explicit_openrouter and not is_gigachat:
+            # LiteLLM natively supports openrouter/ prefix - just set env var if needed
+            if (
+                os.getenv("OPENROUTER_API_KEY") is None
+                and os.getenv("OPENAI_API_KEY") is not None
+            ):
+                os.environ["OPENROUTER_API_KEY"] = os.getenv("OPENAI_API_KEY")
+        elif openrouter_mode and not is_gigachat:
+            # Route non-prefixed models through OpenRouter when sk-or-... key detected
             if (
                 os.getenv("OPENROUTER_API_KEY") is None
                 and os.getenv("OPENAI_API_KEY") is not None
@@ -249,22 +276,20 @@ def generate(
             if "api_base" not in kwargs or not kwargs.get("api_base"):
                 kwargs["api_base"] = "https://openrouter.ai/api/v1"
 
-            # Normalize model name for OpenRouter endpoint:
-            # - "openrouter/openai/gpt-4o" -> "openai/gpt-4o"
-            # - "gpt-4o-mini" -> "openai/gpt-4o-mini"
-            if isinstance(model, str):
-                if model.startswith("openrouter/"):
-                    model = model.replace("openrouter/", "", 1)
-                elif "/" not in model:
-                    model = f"openai/{model}"
+            # Add openai/ prefix for non-prefixed models (e.g., "gpt-4o-mini" -> "openai/gpt-4o-mini")
+            if isinstance(model, str) and "/" not in model:
+                model = f"openai/{model}"
 
             extra_headers = dict(kwargs.get("extra_headers") or {})
-            # Optional but recommended by OpenRouter
             extra_headers.setdefault("X-Title", os.getenv("OPENROUTER_APP_NAME", "tau2"))
             referer = os.getenv("OPENROUTER_HTTP_REFERER")
             if referer:
                 extra_headers.setdefault("HTTP-Referer", referer)
             kwargs["extra_headers"] = extra_headers
+
+        # Disable SSL verification for GigaChat (uses self-signed certificates)
+        if isinstance(model, str) and model.startswith("gigachat/"):
+            kwargs["ssl_verify"] = False
 
         response = completion(
             model=model,
