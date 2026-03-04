@@ -15,8 +15,6 @@ from duma.config import (
     DEFAULT_NUM_TRIALS,
     DEFAULT_SEED,
     DEFAULT_USER_IMPLEMENTATION,
-    DEFAULT_LLM_OUTPUT_ASSERTIONS,
-    DEFAULT_LLM_OUTPUT_ASSERTIONS_TEMPERATURE,
 )
 from duma.data_model.simulation import RunConfig
 from duma.run import get_options, run_domain, run_domains
@@ -137,18 +135,6 @@ def add_run_args(parser):
         "--local-models",
         action="store_true",
         help="Use local models (skip injecting api_key/api_base).",
-    )
-    parser.add_argument(
-        "--output-eval-llm",
-        type=str,
-        default=DEFAULT_LLM_OUTPUT_ASSERTIONS,
-        help=f"The LLM to use for output assertions evaluator. Default is {DEFAULT_LLM_OUTPUT_ASSERTIONS}.",
-    )
-    parser.add_argument(
-        "--output-eval-llm-args",
-        type=json.loads,
-        default={"temperature": DEFAULT_LLM_OUTPUT_ASSERTIONS_TEMPERATURE},
-        help=f"The arguments to pass to the LLM for output assertions evaluator. Default is '{{\"temperature\": {DEFAULT_LLM_OUTPUT_ASSERTIONS_TEMPERATURE}}}'.",
     )
     parser.add_argument(
         "--task-set-name",
@@ -371,8 +357,6 @@ def run_command(args):
         user=args.user,
         llm_user=user_model,
         llm_args_user=user_llm_args,
-        llm_output_eval=args.output_eval_llm,
-        llm_args_output_eval=args.output_eval_llm_args,
         num_trials=args.num_trials,
         max_steps=args.max_steps,
         max_errors=args.max_errors,

@@ -49,14 +49,8 @@ def test_evaluate_simulation_combines_selected_reward_components(monkeypatch):
             reward=0.7, reward_breakdown={RewardType.COMMUNICATE: 0.7}
         ),
     )
-    monkeypatch.setattr(
-        "duma.evaluator.evaluator.OutputAssertionsEvaluator.calculate_reward",
-        lambda **kwargs: RewardInfo(
-            reward=0.9, reward_breakdown={RewardType.OUTPUT_ASSERTION: 0.9}
-        ),
-    )
     task = _task_with_basis(
-        [RewardType.DB, RewardType.ACTION, RewardType.COMMUNICATE, RewardType.OUTPUT_ASSERTION]
+        [RewardType.DB, RewardType.ACTION, RewardType.COMMUNICATE]
     )
     reward_info = evaluate_simulation(
         simulation=_sim(),
@@ -65,11 +59,10 @@ def test_evaluate_simulation_combines_selected_reward_components(monkeypatch):
         solo_mode=False,
         domain="collab",
     )
-    assert reward_info.reward == pytest.approx(0.5 * 0.8 * 0.7 * 0.9)
+    assert reward_info.reward == pytest.approx(0.5 * 0.8 * 0.7)
     assert reward_info.reward_breakdown[RewardType.DB] == 0.5
     assert reward_info.reward_breakdown[RewardType.ACTION] == 0.8
     assert reward_info.reward_breakdown[RewardType.COMMUNICATE] == 0.7
-    assert reward_info.reward_breakdown[RewardType.OUTPUT_ASSERTION] == 0.9
 
 
 def test_evaluate_simulation_raises_when_nl_basis_not_enabled(monkeypatch):
@@ -85,12 +78,6 @@ def test_evaluate_simulation_raises_when_nl_basis_not_enabled(monkeypatch):
         "duma.evaluator.evaluator.CommunicateEvaluator.calculate_reward",
         lambda **kwargs: RewardInfo(
             reward=1.0, reward_breakdown={RewardType.COMMUNICATE: 1.0}
-        ),
-    )
-    monkeypatch.setattr(
-        "duma.evaluator.evaluator.OutputAssertionsEvaluator.calculate_reward",
-        lambda **kwargs: RewardInfo(
-            reward=1.0, reward_breakdown={RewardType.OUTPUT_ASSERTION: 1.0}
         ),
     )
     task = _task_with_basis([RewardType.NL_ASSERTION])
@@ -117,12 +104,6 @@ def test_evaluate_simulation_all_with_nl_includes_nl_reward(monkeypatch):
         "duma.evaluator.evaluator.CommunicateEvaluator.calculate_reward",
         lambda **kwargs: RewardInfo(
             reward=1.0, reward_breakdown={RewardType.COMMUNICATE: 1.0}
-        ),
-    )
-    monkeypatch.setattr(
-        "duma.evaluator.evaluator.OutputAssertionsEvaluator.calculate_reward",
-        lambda **kwargs: RewardInfo(
-            reward=1.0, reward_breakdown={RewardType.OUTPUT_ASSERTION: 1.0}
         ),
     )
     monkeypatch.setattr(
@@ -161,12 +142,6 @@ def test_evaluate_simulation_all_with_nl_skips_nl_when_not_in_basis(monkeypatch)
             reward=1.0, reward_breakdown={RewardType.COMMUNICATE: 1.0}
         ),
     )
-    monkeypatch.setattr(
-        "duma.evaluator.evaluator.OutputAssertionsEvaluator.calculate_reward",
-        lambda **kwargs: RewardInfo(
-            reward=1.0, reward_breakdown={RewardType.OUTPUT_ASSERTION: 1.0}
-        ),
-    )
 
     def _should_not_be_called(**kwargs):
         raise AssertionError("NL evaluator should not be called when NL is not in basis")
@@ -176,7 +151,7 @@ def test_evaluate_simulation_all_with_nl_skips_nl_when_not_in_basis(monkeypatch)
         _should_not_be_called,
     )
 
-    task = _task_with_basis([RewardType.DB, RewardType.OUTPUT_ASSERTION])
+    task = _task_with_basis([RewardType.DB])
     reward_info = evaluate_simulation(
         simulation=_sim(),
         task=task,
@@ -186,4 +161,3 @@ def test_evaluate_simulation_all_with_nl_skips_nl_when_not_in_basis(monkeypatch)
     )
     assert reward_info.reward == pytest.approx(1.0)
     assert reward_info.reward_breakdown[RewardType.DB] == 1.0
-    assert reward_info.reward_breakdown[RewardType.OUTPUT_ASSERTION] == 1.0
