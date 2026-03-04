@@ -17,6 +17,7 @@ class NLAssertionsEvaluator:
         cls,
         task: Task,
         full_trajectory: list[Message],
+        solo_mode: bool = False,
     ) -> RewardInfo:
         """
         Calculate the reward for the simulation by using an LLM to evaluate whether the trajectory adheres to all the natural-language assertions
@@ -38,7 +39,7 @@ class NLAssertionsEvaluator:
             )
 
         nl_assertions_checks = cls.evaluate_nl_assertions(
-            full_trajectory, nl_assertions
+            full_trajectory, nl_assertions, solo_mode=solo_mode
         )
 
         # Calculate reward: 1 if all expectations are met, 0 otherwise
@@ -56,6 +57,7 @@ class NLAssertionsEvaluator:
         cls,
         trajectory: list[Message],
         nl_assertions: list[str],
+        solo_mode: bool = False,
     ) -> list[NLAssertionCheck]:
         """
         Evaluate whether the trajectory meets each expected outcome.
@@ -63,6 +65,7 @@ class NLAssertionsEvaluator:
         Args:
             trajectory: List of messages from the conversation
             nl_assertions: List of natural-language assertions to evaluate
+            solo_mode: If True, adjust evaluation for solo agent runs (no user messages)
 
         Returns:
             List of evaluation results for each NL assertion, containing:
@@ -70,33 +73,53 @@ class NLAssertionsEvaluator:
             - metExpectation: Boolean indicating if the assertion was met
             - reasoning: Explanation for the evaluation
         """
+
+        def format_message(message):
+            if message.role == "assistant" and message.content is None:
+                # Show tool call names for solo mode visibility
+                if hasattr(message, "tool_calls") and message.tool_calls:
+                    calls = ", ".join(tc.name for tc in message.tool_calls)
+                    return f"assistant: [tool calls: {calls}]"
+                return None  # skip empty messages
+            return f"{message.role}: {message.content}"
+
         trajectory_str = "\n".join(
-            [f"{message.role}: {message.content}" for message in trajectory]
+            filter(None, [format_message(msg) for msg in trajectory])
         )
+
+        solo_context = ""
+        if solo_mode:
+            solo_context = """
+        NOTE: This is a solo agent run — there are no user messages, only tool calls and a
+        resolution_note at the end. Evaluate the assertions based on the tool call results
+        and the resolution_note content. The agent communicates its reasoning through the
+        resolution_note at the end of the conversation.
+"""
+
         # System prompt similar to the TypeScript implementation
-        system_prompt = """
+        system_prompt = f"""
         TASK
         - You will be given a list of expected outcomes and a conversation that was collected during a test case run.
         - The conversation is between an agent and a customer.
         - Your job is to evaluate whether the agent satisfies each of the expected outcomes.
         - Grade each expected outcome individually.
-
+{solo_context}
         FORMAT
         - Your response should be a JSON object with the following fields:
         - `reasoning`: a short explanation for your classification
         - `metExpectation`: `true` if the agent satisfies the expected outcomes, `false` otherwise
         - `expectedOutcome`: repeat the expectation from the input that you are grading
-        
+
         Example response structure:
-        {
+        {{
             "results": [
-                {
+                {{
                     "expectedOutcome": "<one of the expected outcomes from the input>",
                     "reasoning": "<reasoning trace>",
                     "metExpectation": <false or true>,
-                }
+                }}
             ]
-        }
+        }}
         """
 
         user_prompt = f"""

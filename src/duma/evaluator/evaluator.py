@@ -56,6 +56,7 @@ def evaluate_simulation(
         reward_info = NLAssertionsEvaluator.calculate_reward(
             task=task,
             full_trajectory=simulation.messages,
+            solo_mode=solo_mode,
         )
     elif evaluation_type == EvaluationType.COMMUNICATE:
         reward_info = CommunicateEvaluator.calculate_reward(
@@ -102,6 +103,7 @@ def evaluate_simulation(
             nl_reward_info = NLAssertionsEvaluator.calculate_reward(
                 task=task,
                 full_trajectory=simulation.messages,
+                solo_mode=solo_mode,
             )
         output_reward_info = OutputAssertionsEvaluator.calculate_reward(
             task=task,
