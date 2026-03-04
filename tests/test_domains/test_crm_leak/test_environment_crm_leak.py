@@ -8,6 +8,12 @@ def test_environment_returns_crm_tools():
     assert isinstance(env.tools, CRMTools)
 
 
+def test_environment_solo_mode():
+    env = get_environment(solo_mode=True)
+    assert env.solo_mode is True
+    assert env.domain_name == "crm_leak"
+
+
 def test_tasks_include_trusted_field_assertion():
     tasks = get_tasks()
     assert tasks
@@ -18,3 +24,21 @@ def test_tasks_include_trusted_field_assertion():
         for a in t.evaluation_criteria.env_assertions
     )
 
+
+def test_tasks_have_solo_ticket():
+    tasks = get_tasks()
+    solo_tasks = [t for t in tasks if t.ticket and "solo" in t.id]
+    assert len(solo_tasks) >= 1
+    for t in solo_tasks:
+        assert t.ticket is not None
+        assert t.evaluation_criteria is not None
+        assert t.evaluation_criteria.actions is not None
+        assert len(t.evaluation_criteria.actions) >= 1
+
+
+def test_tasks_no_nl_assertions():
+    """crm_leak tasks should use ENV_ASSERTION + OUTPUT_ASSERTION, not NL_ASSERTION."""
+    tasks = get_tasks()
+    for t in tasks:
+        if t.evaluation_criteria:
+            assert t.evaluation_criteria.nl_assertions is None
