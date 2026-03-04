@@ -127,7 +127,7 @@ def run_all_experiments(
     domains: Dict[str, List[str]],
     num_trials: int = 10,
     max_concurrency: int = 3,
-    output_dir: Optional[Path] = None,  # Не используется, оставлено для совместимости
+    run_dir_name: str = "",  # Subdirectory name under simulations/ (e.g. "run_20260304_143000")
     parallel_experiments: int = 4,  # Количество параллельных экспериментов
     force_rerun: bool = False,  # Принудительно перезапустить все эксперименты
     user_llm: Optional[str] = None,  # Модель для симуляции пользователя
@@ -145,7 +145,7 @@ def run_all_experiments(
         domains: Словарь {domain: [task_ids]}
         num_trials: Количество прогонов на конфигурацию
         max_concurrency: Максимальное количество параллельных запусков
-        output_dir: Директория для сохранения результатов
+        run_dir_name: Subdirectory name under simulations/ (e.g. "run_20260304_143000")
 
     Returns:
         Path to results directory
@@ -156,10 +156,10 @@ def run_all_experiments(
         raise ValueError("duma_max_concurrency must be > 0")
 
     # duma сохраняет файлы в data/duma/simulations/ автоматически
-    # --save-to принимает имя файла БЕЗ расширения
+    # --save-to принимает имя файла БЕЗ расширения (supports subdirectory paths)
     from duma.utils.utils import DATA_DIR
 
-    actual_output_dir = DATA_DIR / "simulations"
+    actual_output_dir = DATA_DIR / "simulations" / run_dir_name
     actual_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Функция для загрузки всех задач домена из tasks.json
@@ -242,6 +242,9 @@ def run_all_experiments(
                     # Фактический путь к файлу результата
                     output_file = actual_output_dir / f"{file_name}.json"
 
+                    # --save-to path relative to simulations/ (includes run subdir)
+                    save_to_name = f"{run_dir_name}/{file_name}" if run_dir_name else file_name
+
                     # Формируем команду
                     use_local_models = not agent_base_url and not api_key_env
                     if solo:
@@ -263,7 +266,7 @@ def run_all_experiments(
                             "--task-ids",
                             task,
                             "--save-to",
-                            file_name,
+                            save_to_name,
                             "--max-concurrency",
                             str(duma_max_concurrency),
                         ]
@@ -285,7 +288,7 @@ def run_all_experiments(
                             "--task-ids",
                             task,
                             "--save-to",
-                            file_name,
+                            save_to_name,
                             "--max-concurrency",
                             str(duma_max_concurrency),
                         ]
@@ -1669,18 +1672,54 @@ def main():
     # Если домен не указан в tasks_by_domain, используем пустой список (загрузит все задачи)
     domains_dict = {d: tasks_by_domain.get(d, []) for d in args.domains}
 
+    from duma.utils.utils import DATA_DIR
+
+    # Create timestamped run directory name (or use --results-dir for processing)
+    if args.skip_experiments and args.results_dir is not None:
+        # Processing an existing run directory
+        run_dir_name = ""
+        results_dir = args.results_dir
+    else:
+        run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir_name = f"run_{run_timestamp}"
+        results_dir = DATA_DIR / "simulations" / run_dir_name
+
+    print(f"Run directory: {results_dir}")
+
     # Шаг 1: Запустить эксперименты
     if not args.skip_experiments:
         print("=" * 80)
         print("ШАГ 1: Запуск экспериментов")
         print("=" * 80)
+
+        # Save run config snapshot
+        results_dir.mkdir(parents=True, exist_ok=True)
+        run_config = {
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "models": args.models,
+            "temperatures": args.temperatures,
+            "domains": args.domains,
+            "num_trials": args.num_trials,
+            "user_llm": args.user_llm,
+            "solo": args.solo,
+            "max_concurrency": args.max_concurrency,
+            "duma_max_concurrency": args.duma_max_concurrency,
+            "agent_base_url": args.agent_base_url,
+            "api_key_env": args.api_key_env,
+            "force_rerun": args.force_rerun,
+        }
+        config_path = results_dir / "run_config.json"
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(run_config, f, indent=2)
+        print(f"Run config saved to {config_path}")
+
         run_all_experiments(
             args.models,
             args.temperatures,
             domains_dict,
             args.num_trials,
             args.max_concurrency,
-            args.results_dir,
+            run_dir_name=run_dir_name,
             force_rerun=args.force_rerun,
             user_llm=args.user_llm,
             solo=args.solo,
@@ -1695,13 +1734,6 @@ def main():
     print("\n" + "=" * 80)
     print("ШАГ 2: Обработка результатов")
     print("=" * 80)
-    # Определить директорию с результатами
-    if args.results_dir is None:
-        from duma.utils.utils import DATA_DIR
-
-        results_dir = DATA_DIR / "simulations"
-    else:
-        results_dir = args.results_dir
 
     # Сформировать ожидаемый список файлов результатов для выбранных
     # доменов/моделей/температур, чтобы:
@@ -1898,6 +1930,7 @@ def main():
 
     print("\n" + "=" * 80)
     print("ГОТОВО!")
+    print(f"Results directory: {results_dir}")
     print("=" * 80)
 
 
