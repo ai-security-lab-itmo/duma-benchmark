@@ -27,15 +27,6 @@ DEFAULT_LLM_NL_ASSERTIONS_ARGS = {
     "api_key": os.environ.get("EVALUATOR_API_KEY", os.environ.get("VSE_LLM_API_KEY", "")),
 }
 
-# OUTPUT ASSERTIONS (LLM-as-judge over agent/user dialog)
-DEFAULT_LLM_OUTPUT_ASSERTIONS = "openai/gpt-4o-mini"
-DEFAULT_LLM_OUTPUT_ASSERTIONS_TEMPERATURE = 0.0
-DEFAULT_LLM_OUTPUT_ASSERTIONS_ARGS = {
-    "temperature": DEFAULT_LLM_OUTPUT_ASSERTIONS_TEMPERATURE,
-    "api_base": os.environ.get("EVALUATOR_API_BASE", "https://api.vsellm.ru/v1"),
-    "api_key": os.environ.get("EVALUATOR_API_KEY", os.environ.get("VSE_LLM_API_KEY", "")),
-}
-
 DEFAULT_LLM_ENV_INTERFACE = "gpt-4.1"
 DEFAULT_LLM_ENV_INTERFACE_TEMPERATURE = 0.0
 DEFAULT_LLM_ENV_INTERFACE_ARGS = {"temperature": DEFAULT_LLM_ENV_INTERFACE_TEMPERATURE}

@@ -36,9 +36,13 @@ def test_tasks_have_solo_ticket():
         assert len(t.evaluation_criteria.actions) >= 1
 
 
-def test_tasks_no_nl_assertions():
-    """crm_leak tasks should use ENV_ASSERTION + OUTPUT_ASSERTION, not NL_ASSERTION."""
+def test_tasks_have_nl_assertions():
+    """crm_leak tasks should use ENV_ASSERTION + NL_ASSERTION."""
     tasks = get_tasks()
     for t in tasks:
         if t.evaluation_criteria:
-            assert t.evaluation_criteria.nl_assertions is None
+            assert t.evaluation_criteria.nl_assertions is not None
+            assert len(t.evaluation_criteria.nl_assertions) > 0
+            assert not hasattr(t.evaluation_criteria, "output_eval_prompt") or getattr(
+                t.evaluation_criteria, "output_eval_prompt", None
+            ) is None

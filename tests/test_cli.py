@@ -25,8 +25,6 @@ def _args(**overrides):
         "user_provider": None,
         "api_key_env": None,
         "local_models": False,
-        "output_eval_llm": "gpt-4o-mini",
-        "output_eval_llm_args": {"temperature": 0.0},
         "num_trials": 1,
         "max_steps": 5,
         "max_errors": 5,
