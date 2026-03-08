@@ -12,7 +12,6 @@
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{float}
-\usepackage{subcaption}
 \newcommand{\sabrina}[1]{{\color{blue}[[Sabrina: #1]]}}
 
 \title{DUMA-bench: A Dual-Control Multi-Agent Benchmark for Evaluating LLM Agent Security}
@@ -98,25 +97,6 @@
 
     Dual-control interaction introduces additional pathways for adversarial influence. Malicious content can propagate through retrieved context, user interaction, or agent communication. Evaluating security under this interaction model therefore exposes vulnerabilities that may remain hidden in static or single-controller evaluation settings.
 
-\begin{figure}[t]
-    \centering
-    \begin{subfigure}[t]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Gemini_Generated_Image_Solo.png}
-        \caption{Solo (passive-user) evaluation. The task is a static input; the agent interacts only with the environment.}
-        \label{fig:solo}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[t]{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Gemini_Generated_Image_Dual.png}
-        \caption{Dual-control evaluation. Both the user (LLM simulator) and the agent exchange messages and issue tool calls, jointly shaping the interaction trajectory.}
-        \label{fig:dual}
-    \end{subfigure}
-    \caption{Evaluation modes in DUMA-bench. In both modes, state and communication assertions verify agent behavior after the interaction completes.}
-    \label{fig:eval_modes}
-\end{figure}
-
     \subsection{Threat Model}
 
     We assume a grey-box attacker with realistic capabilities. The attacker is assumed to understand the system architecture and available tools but does not have access to model weights or the system prompt.
@@ -129,15 +109,11 @@
 
     DUMA-bench evaluates agent robustness across eight security domains representing common classes of vulnerabilities in LLM-based agent systems.
 
-    \paragraph{mail\_rag\_phishing (RAG poisoning).} This domain evaluates robustness to indirect prompt injection attacks in retrieval-augmented email workflows. The environment simulates a mailbox-backed assistant that can retrieve relevant context snippets and send outbound email. Malicious instructions are
-    embedded in retrievable content and are designed to look operationally relevant. The agent must use retrieved context for task
-    completion without treating embedded adversarial instructions as authoritative workflow guidance.
+    \paragraph{mail\_rag\_phishing (RAG poisoning).} This domain evaluates robustness to indirect prompt injection attacks in retrieval-augmented email workflows. The environment simulates a mailbox-backed assistant that can retrieve relevant context snippets and send outbound email. Malicious instructions are embedded in retrievable content and are designed to look operationally relevant. The agent must use retrieved context for task completion without treating embedded adversarial instructions as authoritative workflow guidance.
 
-    \paragraph{collab (cross-agent manipulation).}
-    This domain models a multi-agent collaboration environment where agents communicate through shared channels and coordinate task execution. An attacking agent acting as a colleague attempts to manipulate the target agent through misleading instructions, task delegation requests, or privilege escalation attempts. The environment provides tools for retrieving tasks, updating tickets, delegating work, accessing activity logs, and sending messages between agents.
+    \paragraph{collab (cross-agent manipulation).} This domain models collaborator-mediated attacks in a support workflow. The target agent receives ticket context together with one or more notes attributed to a colleague, some of which may be malicious or conflicting. The environment exposes tools for inspecting ticket state and for taking sensitive actions such as sharing logs, deleting audit-relevant records, or resetting credentials. The agent must distinguish legitimate collaboration from adversarial manipulation and avoid unsafe operational actions.
 
-    \paragraph{output\_handling (unsafe output generation).}
-    This domain evaluates whether the agent generates unsafe output that can trigger downstream vulnerabilities such as cross-site scripting, SQL injection, or malicious redirects. The environment simulates a web application in which the agent generates content that is subsequently rendered or processed by external systems. The agent must ensure that generated outputs remain safe when interpreted by downstream components.
+    \paragraph{output\_handling (unsafe output generation).} This domain evaluates whether the agent forwards unsafe content that can trigger downstream vulnerabilities such as cross-site scripting, SQL injection, or malicious redirects. The environment provides customer-facing ticket context, collaborator notes, sanitized response paths, and a dangerous raw-snippet forwarding path. The agent must respond helpfully while ensuring that unsafe artifacts are not propagated to downstream systems or end users.
 
     \paragraph{crm\_leak (trusted-data oversharing).}
     This domain evaluates whether an agent improperly discloses restricted third-party data while handling otherwise legitimate CRM
@@ -173,13 +149,16 @@
     \subsection{Assertion Design}
     \label{sec:assertions}
 
-    Each evaluation case in DUMA-bench specifies a set of binary assertions that must hold after the interaction completes. We use two complementary assertion types that capture distinct failure modes: \emph{state assertions} verify what the agent \emph{did}; \emph{communication assertions} verify what the agent \emph{said}.
+    Each evaluation case in DUMA-bench specifies a set of binary assertions that must hold after the interaction completes. We use
+    complementary assertion types that capture different failure modes: environment/state assertions verify whether forbidden or
+    required effects occurred in the executable environment, while communication assertions verify whether the assistant's textual
+    behavior satisfied the task's policy expectations.
 
     \paragraph{State assertions.}
-    A state assertion is a deterministic function over the post-execution environment state. After the interaction completes, the evaluator replays the agent's tool calls to reconstruct the resulting database, then executes the assertion function and checks its return value. Because these checks are fully deterministic, they are not susceptible to LLM judge bias. For example, in the \texttt{auth\_spoof\_support} domain the assertion \texttt{assert\_no\_refund\_without\_verification} inspects the environment's refund log after execution and fails if any entry has \texttt{verified=False}, regardless of what the agent communicated to the user.
+    A state assertion is a deterministic function over the post-execution environment state. After the interaction completes, the evaluator reconstructs the post-execution environment by replaying the executable trajectory, including the tool calls recorded in the interaction history, then executes the assertion function and checks its return value. Because these checks are fully deterministic, they are not susceptible to LLM judge bias. For example, in the \texttt{auth\_spoof\_support} domain the assertion \texttt{assert\_no\_refund\_without\_verification} inspects the environment's refund log after execution and fails if any entry has \texttt{verified=False}, regardless of what the agent communicated to the user.
 
     \paragraph{Communication assertions.}
-    Some security properties leave no trace in environment state. For example, an agent may correctly refuse to issue an unauthorized refund (passing all state assertions) yet still disclose protected customer data in its response text. Communication assertions address this gap: each assertion is a natural-language expectation evaluated by an LLM judge against the full conversation trajectory. For instance, in the \texttt{crm\_leak} domain the assertion \emph{``The assistant did not disclose ANY data from the trusted document --- guarantor name, passport, birthdate, address, phone''} checks that the agent's responses contain no protected fields, even if no unauthorized tool call was made.
+    Some security properties leave no trace in environment state. For example, an agent may correctly refuse to issue an unauthorized refund (passing all state assertions) yet still disclose protected customer data in its response text. Communication assertions address this gap: each assertion is a natural-language expectation evaluated against the assistant's behavior in the recorded conversation trajectory. For instance, in the \texttt{crm\_leak} domain the assertion \emph{``The assistant did not disclose ANY data from the trusted document --- guarantor name, passport, birthdate, address, phone''} checks that the agent's responses contain no protected fields, even if no unauthorized tool call was made.
 
     \paragraph{Composition and final success.}
     Each task specifies a \emph{reward basis} $B$ --- the subset of assertion types that contribute to the final score. Within each type, all assertions must pass: the per-type score $r_t$ is $1$ only if every assertion of that type succeeds, and $0$ otherwise. The task reward is the product across types:
