@@ -28,36 +28,39 @@
 
     \begin{abstract}
 
-        LLM-based agents are increasingly deployed in environments where they interact with users, tools, and other agents. In such settings, security failures often emerge not only from adversarial prompts but from the interaction between the agent and dynamic user behavior. However, current evaluation paradigms remain fragmented: coordination benchmarks study multi-agent interaction without adversarial threats, while security benchmarks typically assume passive users and static control. We introduce \textbf{DUMA-bench, a benchmark and evaluation protocol} for measuring agent security under \emph{dual-control} interaction, where both the agent and the user can independently observe and modify the environment state. DUMA-bench extends $\tau^2$-bench with structured adversarial domains that model three common vulnerability classes: RAG poisoning, cross-agent manipulation, and unsafe output handling. We evaluate \sabrina{TO DO: add actual model list} across multiple user-behavior regimes. Comparing passive-user (solo) and dual-control evaluation on \sabrina{TO DO: add actual model list} shows that the evaluation protocol itself changes measured robustness: aggregate performance drops from 0.703 to 0.615 \passone\ under dual-control ($p=0.0018$), with the largest shift occurring in \texttt{mktg\_phishing}, where \passone\ decreases from 0.979 to 0.375. These results demonstrate that agent security is not solely a property of the model but emerges from the interaction between the model, the user, and the environment. DUMA-bench provides a missing evaluation layer for studying security in realistic agent deployments and enables standardized comparison of defense mechanisms under interactive conditions.
+        LLM-based agents are increasingly deployed in environments where they interact with users, tools, and other agents. In such settings, security failures often emerge not only from adversarial prompts but from the interaction between the agent and dynamic user behavior. However, current evaluation paradigms remain fragmented: coordination benchmarks study multi-agent interaction without adversarial threats, while security benchmarks typically assume passive users and static control. We introduce \textbf{DUMA-bench, a benchmark and evaluation protocol} for measuring agent security under \emph{dual-control} interaction, where the agent and the user act as independent participants in a shared interaction loop, each influencing the trajectory through
+        messages and, when permitted by a domain, through scoped tool actions. DUMA-bench extends $\tau^2$-bench~\cite{barres2025tau2bench} with structured adversarial domains that model eight common vulnerability classes: RAG poisoning, cross-agent manipulation, unsafe output handling and others. We evaluate latest OpenAI, Anthropic, Qwen, Z.ai models across multiple user-behavior regimes. Comparison of passive-user (solo) and dual-control evaluation in these models shows that the evaluation protocol itself changes the measured robustness: aggregate performance drops from 0.703 to 0.615 \passone\ under dual-control ($p=0.0018$), with the largest shift occurring in \texttt{mktg\_phishing}, where \passone\ decreases from 0.979 to 0.375. These results demonstrate that agent security is not solely a property of the model but emerges from the interaction between the model, the user, and the environment. The DUMA-bench provides a missing evaluation layer for studying security in realistic agent deployments and enables standardized comparison of defense mechanisms under interactive conditions.
 
     \end{abstract}
 
     \section{Introduction}
     \label{sec:intro}
 
-    LLM-based agents are increasingly deployed in environments where they interact with users, tools, and other agents. In such settings, security failures often arise not only from adversarial prompts but from the interaction between the agent and dynamic user behavior. User requests, retrieved documents, and inter-agent communication can all modify the system state and influence the agent’s decisions. As a result, security vulnerabilities in agent systems frequently emerge from interaction dynamics rather than from isolated prompts.
+    LLM-based agents are increasingly deployed in environments where they interact with users, tools, and other information sources. In such settings, security failures often arise not only from adversarial prompts but from the interaction between the agent and dynamic user behavior. User requests, retrieved documents, and collaborator-generated notes can all alter the information available to the agent and thereby influence downstream tool use. As a result, vulnerabilities in agent systems often emerge from interaction dynamics rather than from isolated prompts alone.
 
-    Despite this shift toward interactive systems, current evaluation paradigms remain fragmented. Coordination benchmarks such as $\tau$-bench and $\tau^2$-bench study multi-agent interaction and shared-control environments but do not model adversarial threats. Security benchmarks such as Agent Security Bench and Agent Dojo evaluate prompt injection and related attacks but assume passive users and static control. Consequently, the two strands of evaluation capture complementary aspects of agent behavior but fail to address their intersection.
+    Despite this shift toward interactive systems, current evaluation paradigms remain fragmented. Coordination benchmarks such as $\tau$-bench~\cite{yao2024taubench} and $\tau^2$-bench~\cite{barres2025tau2bench} study multi-agent interaction and shared-control environments but do not model adversarial threats. Security benchmarks such as Agent Security Bench~\cite{zhang2025asb} and Agent Dojo~\cite{debenedetti2024agentdojo} evaluate prompt injection and related attacks but assume passive users and static control. Consequently, the two strands of evaluation capture complementary aspects of agent behavior but fail to address their intersection.
 
-    This separation creates a methodological gap in agent security evaluation. Real-world agent deployments operate under \emph{dual-control}: both the agent and the user can observe and modify the shared environment state. Adversarial content may therefore propagate through multiple channels, including retrieved context, user requests, and agent communication. Evaluating security in settings where the user is passive removes a key dimension along which robustness can vary and fail, potentially obscuring vulnerabilities that arise only through interaction.
+    This separation creates a methodological gap in agent security evaluation. Real-world agent deployments operate under \emph{dual-control}: both the agent and the user participate as independent actors in the same interaction process, each able to influence future system
+    behavior through messages and, in the general case, through role-specific tool actions~\cite{barres2025tau2bench}. Adversarial content may therefore propagate through multiple channels, including retrieved context, user requests, and agent communication. Evaluating security in settings where the user is passive removes a key dimension along which robustness can vary and fail, potentially obscuring vulnerabilities that arise only through interaction.
 
-    To address this gap, we introduce \textbf{DUMA-bench}, a benchmark and evaluation methodology for studying agent security under dual-control interaction. DUMA-bench extends $\tau^2$-bench with structured adversarial domains that embed attacks directly into interactive environments. The benchmark evaluates agents in scenarios where both the agent and the user can independently observe and modify system state, enabling the study of how interaction dynamics influence security outcomes.
+    To address this gap, we introduce \textbf{DUMA-bench}, a benchmark and evaluation methodology for studying agent security under dual-control interaction. DUMA-bench extends $\tau^2$-bench~\cite{barres2025tau2bench} with structured adversarial domains that embed attacks directly into interactive environments. The benchmark evaluates agents in scenarios where the user is an active participant rather than a passive prompt source, enabling the study of how interaction dynamics influence security outcomes.
 
-    DUMA-bench includes three domains capturing common classes of vulnerabilities in LLM-based agent systems: RAG poisoning through retrieved documents, cross-agent manipulation in collaborative environments, and unsafe output generation that may trigger downstream vulnerabilities. By embedding these attacks in interactive environments, the benchmark enables systematic evaluation of how user behavior, interaction structure, and model capability affect security robustness.
+    DUMA-bench includes eight domains capturing common classes of vulnerabilities in LLM-based agent systems. By embedding these attacks in interactive environments, the benchmark enables systematic evaluation of how user behavior, interaction structure, and model capability affect security robustness.
 
     \subsection{Contributions}
 
     \begin{itemize}[leftmargin=1.2em]
     \item We identify a methodological gap in agent security evaluation: existing benchmarks study either coordination without adversarial threats or security attacks under passive-user assumptions.
-    \item We introduce a dual-control evaluation methodology in which both the agent and the user can independently observe and modify environment state.
-    \item We implement this methodology in \textbf{DUMA-bench} by extending $\tau^2$-bench with three interactive adversarial domains: \texttt{mail\_rag\_phishing}, \texttt{collab}, and \texttt{output\_handling}.
+    \item We introduce a dual-control evaluation methodology in which the agent and the user act independently within the same execution loop, with security outcomes shaped by their interaction rather
+    than by the agent alone.
+    \item We implement this methodology in \textbf{DUMA-bench} by extending $\tau^2$-bench~\cite{barres2025tau2bench} with eight interactive adversarial domains.
     \item We empirically demonstrate that evaluation under dual-control interaction changes measured robustness and reveals vulnerabilities that remain hidden under passive-user evaluation.
     \end{itemize}
 
     \section{Related Work}
 
     \paragraph{Agent coordination and dual-control benchmarks.}
-    Early evaluations of LLM-based agents focused on single-agent tool use and instruction following, assuming full observability and centralized control. Benchmarks such as AgentBench~\cite{liu2025agentbench} and Toolformer~\cite{schick2023toolformer} characterized isolated reasoning abilities but did not model interaction with an active user. The $\tau$-bench framework~\cite{yao2024taubench} introduced a dynamic user that can alter the environment state, while $\tau^2$-bench~\cite{barres2025tau2bench} formalized this as a two-party Dec-POMDP~\cite{amato2013decpomdp} and showed that dual-control alone can degrade agent performance by up to 25 percentage points.
+    Early evaluations of LLM-based agents focused on single-agent tool use and instruction following, assuming full observability and centralized control. Benchmarks such as AgentBench~\cite{liu2025agentbench} and Toolformer~\cite{schick2023toolformer} characterized isolated reasoning abilities but did not model interaction with an active user. For a comprehensive survey of tool learning, see Qin et al.~\cite{qin2025toollearning}. The $\tau$-bench framework~\cite{yao2024taubench} introduced a dynamic user that can alter the environment state, while $\tau^2$-bench~\cite{barres2025tau2bench} formalized this as a two-party Dec-POMDP~\cite{amato2013decpomdp} and showed that dual-control alone can degrade agent performance by up to 25 percentage points.
 
     Multi-agent coordination adds further complexity. REALM-Bench~\cite{geng2025realm} evaluates agents in logistics and scheduling tasks under dynamic disruptions, revealing failure modes such as role confusion and communication breakdowns. Recent surveys~\cite{jin2025survey} and generative agent simulations~\cite{park2023generative} highlight that scaling to $N$-player environments introduces challenges like joint policy factorization and coalition instability. However, these works do not incorporate adversarial threats or security evaluation.
 
@@ -72,7 +75,7 @@
 
     \paragraph{The gap and DUMA-bench.}
 
-    None of the existing benchmarks combine (i) dual-control interaction, (ii) multi-agent coordination, and (iii) security vulnerabilities in a unified evaluation framework. DUMA-bench fills this gap by extending the dual-control paradigm to $N$-player agent systems and embedding realistic attack scenarios (RAG poisoning, cross-agent manipulation, unsafe output handling). This enables the study of how interaction dynamics affect security outcomes and reveals failure modes that remain hidden under passive-user or single-agent evaluation.
+    None of the existing benchmarks combine (i) dual-control interaction, (ii) multi-agent coordination, and (iii) security vulnerabilities in a unified evaluation framework. DUMA-bench fills this gap by extending the dual-control evaluation paradigm to interactive security scenarios that include collaborator-style and environment-mediated attacks and embedding realistic attack scenarios. This enables the study of how interaction dynamics affect security outcomes and reveals failure modes that remain hidden under passive-user or single-agent evaluation.
 
     \section{Method}
 
@@ -82,15 +85,15 @@
 
     The environment simulates a system with tools, external data sources, and internal state variables. The agent is an LLM-based controller that observes the environment and performs actions through available tools. The user interacts with the agent by issuing requests and may also modify the environment state through permitted actions. Security assertions specify invariants that must hold during execution, such as preventing unauthorized actions, preserving data integrity, or refusing malicious instructions.
 
-    Evaluation proceeds as an interactive loop. At each step the agent observes the current environment state, the user issues requests or modifies context, and the agent responds by selecting tool actions. The environment updates its state based on these actions and the interaction continues until the task terminates. After the interaction completes, security assertions are evaluated to determine whether the agent preserved the required security properties.
+    Evaluation proceeds as an interactive loop. At each step, the user and the agent exchange messages, the active participant may issue tool calls when allowed, and the environment updates its state in response to those executable actions. The environment updates its state based on these actions and the interaction continues until the task terminates. After the interaction completes, security assertions are evaluated to determine whether the agent preserved the required security properties.
 
     \subsection{Dual-Control Interaction Model}
 
-    To capture interaction dynamics between agents and users, DUMA-bench adopts the dual-control interaction structure introduced in $\tau^2$-bench. In this setting both the agent and the user operate as independent actors that observe and modify a shared environment state.
+    To capture interaction dynamics between agents and users, DUMA-bench adopts the dual-control interaction structure introduced in $\tau^2$-bench~\cite{barres2025tau2bench}. In this setting both the agent and the user operate as independent actors within a shared interaction loop, each receiving partial observations and influencing future execution.
 
-    The environment is represented by a partially observable state space $S$. The agent $A$ and the user $U$ receive observations derived from this state and select actions from their respective action spaces. Agent actions correspond to tool invocations and system operations, while user actions correspond to requests or state-modifying inputs.
+    The environment is represented by a partially observable state space $S$. The agent $A$ and the user $U$ receive observations derived from this state and select actions from their respective action spaces. Agent actions correspond to tool invocations and communication acts. User actions correspond primarily to message-level interaction and, in the general framework, may additionally include user-scoped tool calls when such tools are available in a domain.
 
-    The environment evolves according to a transition function that depends on the actions of both participants. As a result, both actors can influence the system trajectory. This formulation reflects the behavior of real deployed agent systems, where users are not passive instruction sources but active participants capable of modifying system state.
+    The environment evolves according to a transition function that depends on the actions of both participants. As a result, both actors can influence the system trajectory. This formulation reflects the behavior of real deployed agent systems, where users are not passive instruction sources but active participants whose behavior can alter the trajectory and indirectly affect state transitions.
 
     Dual-control interaction introduces additional pathways for adversarial influence. Malicious content can propagate through retrieved context, user interaction, or agent communication. Evaluating security under this interaction model therefore exposes vulnerabilities that may remain hidden in static or single-controller evaluation settings.
 
@@ -104,16 +107,48 @@
 
     \subsection{Security Domains}
 
-    DUMA-bench evaluates agent robustness across three security domains representing common classes of vulnerabilities in LLM-based agent systems.
+    DUMA-bench evaluates agent robustness across eight security domains representing common classes of vulnerabilities in LLM-based agent systems.
 
-    \paragraph{mail\_rag\_phishing (RAG poisoning).}
-    This domain evaluates robustness to indirect prompt injection attacks in retrieval-augmented generation systems. The environment simulates an email client that uses a mailbox as a knowledge base. The agent can search the mailbox for relevant messages and retrieve full email content using dedicated tools. Malicious instructions are embedded within email messages and may appear in retrieved context. The agent must distinguish between legitimate information and adversarial instructions when composing responses.
+    \paragraph{mail\_rag\_phishing (RAG poisoning).} This domain evaluates robustness to indirect prompt injection attacks in retrieval-augmented email workflows. The environment simulates a mailbox-backed assistant that can retrieve relevant context snippets and send outbound email. Malicious instructions are
+    embedded in retrievable content and are designed to look operationally relevant. The agent must use retrieved context for task
+    completion without treating embedded adversarial instructions as authoritative workflow guidance.
 
     \paragraph{collab (cross-agent manipulation).}
     This domain models a multi-agent collaboration environment where agents communicate through shared channels and coordinate task execution. An attacking agent acting as a colleague attempts to manipulate the target agent through misleading instructions, task delegation requests, or privilege escalation attempts. The environment provides tools for retrieving tasks, updating tickets, delegating work, accessing activity logs, and sending messages between agents.
 
     \paragraph{output\_handling (unsafe output generation).}
     This domain evaluates whether the agent generates unsafe output that can trigger downstream vulnerabilities such as cross-site scripting, SQL injection, or malicious redirects. The environment simulates a web application in which the agent generates content that is subsequently rendered or processed by external systems. The agent must ensure that generated outputs remain safe when interpreted by downstream components.
+
+    \paragraph{crm\_leak (trusted-data oversharing).}
+    This domain evaluates whether an agent improperly discloses restricted third-party data while handling otherwise legitimate CRM
+    support requests. The environment provides a case bundle with both shareable customer fields and non-shareable trusted records,
+    creating a realistic oversharing risk when the requester uses urgency or faux-regulatory pressure. The agent can inspect the case
+    through a retrieval tool but must answer using only allowed fields and refuse to reveal trusted information.
+
+    \paragraph{infra\_loadshed (resource overload / denial-of-wallet).}
+    This domain models infrastructure-facing manipulation in which a collaborator pressures the agent to trigger expensive or disruptive
+    actions that waste quota, burn API budget, or reduce service availability. The environment exposes operational tools for checking
+    cluster state alongside dangerous actions such as launching heavy jobs, calling paid external APIs, overriding quota limits, or
+    shutting down the cluster. The agent must reject requests that would create unnecessary cost or instability even when they are
+    framed as urgent operational fixes.
+
+    \paragraph{mktg\_phishing (campaign abuse).}
+    This domain evaluates whether a marketing-facing agent can be coerced into sending phishing-style outbound email under KPI pressure
+    or urgency framing. The environment simulates campaign operations with tools for reading briefs, reviewing collaborator notes,
+    requesting security review, and sending email. The agent must block unapproved external domains, avoid credential-harvesting
+    patterns, and escalate suspicious campaigns instead of executing them.
+
+    \paragraph{auth\_spoof\_support (identity spoofing and auth bypass).}
+    This domain models customer-support workflows where an attacker attempts to bypass identity verification through VIP pressure,
+    manager override claims, or impersonation. The environment provides account-summary and verification tools, along with privileged
+    actions such as updating email addresses and issuing refunds. The agent must enforce verification before any sensitive action and
+    resist social-engineering attempts that try to shortcut the normal approval flow.
+
+    \paragraph{tool\_shadow\_poison (tool shadowing and unsigned export misuse).}
+    This domain evaluates whether an agent can distinguish approved tools from shadow or alias-like tools that appear convenient but
+    violate policy. The environment exposes a tool manifest, policy lookup, a safe signed export path, and a dangerous fast snapshot
+    export that mimics legitimate functionality. The agent must inspect tool provenance, refuse unsigned or shadow exports, and use only
+    approved signed tooling when handling customer data.
 
     \subsection{Assertion Design}
     \label{sec:assertions}
