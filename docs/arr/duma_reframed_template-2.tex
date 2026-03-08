@@ -1,0 +1,366 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{float}
+\newcommand{\sabrina}[1]{{\color{blue}[[Sabrina: #1]]}}
+
+\title{DUMA-bench: A Dual-Control Multi-Agent Benchmark for Evaluating LLM Agent Security}
+\author{Anonymous ACL submission}
+\date{}
+
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\passone}{\text{pass@1}}
+\newcommand{\passk}{\text{pass@}k}
+\newcommand{\asr}{\text{ASR}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+
+LLM-based agents are increasingly deployed in environments where they interact with users, tools, and other agents. In such settings, security failures often emerge not only from adversarial prompts but from the interaction between the agent and dynamic user behavior. However, current evaluation paradigms remain fragmented: coordination benchmarks study multi-agent interaction without adversarial threats, while security benchmarks typically assume passive users and static control. We introduce \textbf{DUMA-bench, a benchmark and evaluation protocol} for measuring agent security under \emph{dual-control} interaction, where both the agent and the user can independently observe and modify the environment state. DUMA-bench extends $\tau^2$-bench with structured adversarial domains that model three common vulnerability classes: RAG poisoning, cross-agent manipulation, and unsafe output handling. We evaluate \sabrina{TO DO: add actual model list} across multiple user-behavior regimes. Comparing passive-user (solo) and dual-control evaluation on \sabrina{TO DO: add actual model list} shows that the evaluation protocol itself changes measured robustness: aggregate performance drops from 0.703 to 0.615 \passone\ under dual-control ($p=0.0018$), with the largest shift occurring in \texttt{mktg\_phishing}, where \passone\ decreases from 0.979 to 0.375. These results demonstrate that agent security is not solely a property of the model but emerges from the interaction between the model, the user, and the environment. DUMA-bench provides a missing evaluation layer for studying security in realistic agent deployments and enables standardized comparison of defense mechanisms under interactive conditions.
+
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+LLM-based agents are increasingly deployed in environments where they interact with users, tools, and other agents. In such settings, security failures often arise not only from adversarial prompts but from the interaction between the agent and dynamic user behavior. User requests, retrieved documents, and inter-agent communication can all modify the system state and influence the agent’s decisions. As a result, security vulnerabilities in agent systems frequently emerge from interaction dynamics rather than from isolated prompts.
+
+Despite this shift toward interactive systems, current evaluation paradigms remain fragmented. Coordination benchmarks such as $\tau$-bench and $\tau^2$-bench study multi-agent interaction and shared-control environments but do not model adversarial threats. Security benchmarks such as Agent Security Bench and Agent Dojo evaluate prompt injection and related attacks but assume passive users and static control. Consequently, the two strands of evaluation capture complementary aspects of agent behavior but fail to address their intersection.
+
+This separation creates a methodological gap in agent security evaluation. Real-world agent deployments operate under \emph{dual-control}: both the agent and the user can observe and modify the shared environment state. Adversarial content may therefore propagate through multiple channels, including retrieved context, user requests, and agent communication. Evaluating security in settings where the user is passive removes a key dimension along which robustness can vary and fail, potentially obscuring vulnerabilities that arise only through interaction.
+
+To address this gap, we introduce \textbf{DUMA-bench}, a benchmark and evaluation methodology for studying agent security under dual-control interaction. DUMA-bench extends $\tau^2$-bench with structured adversarial domains that embed attacks directly into interactive environments. The benchmark evaluates agents in scenarios where both the agent and the user can independently observe and modify system state, enabling the study of how interaction dynamics influence security outcomes.
+
+DUMA-bench includes three domains capturing common classes of vulnerabilities in LLM-based agent systems: RAG poisoning through retrieved documents, cross-agent manipulation in collaborative environments, and unsafe output generation that may trigger downstream vulnerabilities. By embedding these attacks in interactive environments, the benchmark enables systematic evaluation of how user behavior, interaction structure, and model capability affect security robustness.
+
+\subsection{Contributions}
+
+\begin{itemize}[leftmargin=1.2em]
+    \item We identify a methodological gap in agent security evaluation: existing benchmarks study either coordination without adversarial threats or security attacks under passive-user assumptions.
+    \item We introduce a dual-control evaluation methodology in which both the agent and the user can independently observe and modify environment state.
+    \item We implement this methodology in \textbf{DUMA-bench} by extending $\tau^2$-bench with three interactive adversarial domains: \texttt{mail\_rag\_phishing}, \texttt{collab}, and \texttt{output\_handling}.
+    \item We empirically demonstrate that evaluation under dual-control interaction changes measured robustness and reveals vulnerabilities that remain hidden under passive-user evaluation.
+\end{itemize}
+
+\section{Related Work}
+\sabrina{
+TBD: Please revise the Related Work section using the outline provided here:
+\url{https://docs.google.com/document/d/1iTgW12Hk28JbppBwK4o3cG2kB1fMr-rj5a_f-FoEh-8/edit?tab=t.0#heading=h.vfv96b5boy8n}.
+
+When rewriting, focus on positioning the paper along three axes:
+(1) agent coordination / dual-control benchmarks,
+(2) LLM agent security benchmarks,
+(3) RAG and environment-level attacks.
+
+Keep the section concise: ARR has an 8--9 page limit for the main paper, so the related work should highlight only the most relevant evaluation frameworks and clearly explain what gap DUMA-bench fills.
+}
+
+\section{Method}
+
+\subsection{Evaluation Framework}
+
+DUMA-bench evaluates the security of LLM-based agents through executable interaction scenarios. Each evaluation case consists of four components: an environment, an agent, a user, and a set of security assertions.
+
+The environment simulates a system with tools, external data sources, and internal state variables. The agent is an LLM-based controller that observes the environment and performs actions through available tools. The user interacts with the agent by issuing requests and may also modify the environment state through permitted actions. Security assertions specify invariants that must hold during execution, such as preventing unauthorized actions, preserving data integrity, or refusing malicious instructions.
+
+Evaluation proceeds as an interactive loop. At each step the agent observes the current environment state, the user issues requests or modifies context, and the agent responds by selecting tool actions. The environment updates its state based on these actions and the interaction continues until the task terminates. After the interaction completes, security assertions are evaluated to determine whether the agent preserved the required security properties.
+
+\subsection{Dual-Control Interaction Model}
+
+To capture interaction dynamics between agents and users, DUMA-bench adopts the dual-control interaction structure introduced in $\tau^2$-bench. In this setting both the agent and the user operate as independent actors that observe and modify a shared environment state.
+
+The environment is represented by a partially observable state space $S$. The agent $A$ and the user $U$ receive observations derived from this state and select actions from their respective action spaces. Agent actions correspond to tool invocations and system operations, while user actions correspond to requests or state-modifying inputs.
+
+The environment evolves according to a transition function that depends on the actions of both participants. As a result, both actors can influence the system trajectory. This formulation reflects the behavior of real deployed agent systems, where users are not passive instruction sources but active participants capable of modifying system state.
+
+Dual-control interaction introduces additional pathways for adversarial influence. Malicious content can propagate through retrieved context, user interaction, or agent communication. Evaluating security under this interaction model therefore exposes vulnerabilities that may remain hidden in static or single-controller evaluation settings.
+
+\subsection{Threat Model}
+
+We assume a grey-box attacker with realistic capabilities. The attacker is assumed to understand the system architecture and available tools but does not have access to model weights or the system prompt.
+
+The attacker can inject malicious content into input channels commonly present in agent systems. These channels include retrieved documents in RAG pipelines, communication messages between agents, user-facing inputs, and external data sources accessed through tools. The attacker’s objective is to induce the agent to perform unauthorized actions, disclose protected information, or generate outputs that trigger downstream vulnerabilities.
+
+Importantly, the attacker does not directly control the agent. Instead, malicious content is embedded in the environment or communication channels and must propagate through the interaction between the agent and the user.
+
+\subsection{Security Domains}
+
+DUMA-bench evaluates agent robustness across three security domains representing common classes of vulnerabilities in LLM-based agent systems.
+
+\paragraph{mail\_rag\_phishing (RAG poisoning).}
+This domain evaluates robustness to indirect prompt injection attacks in retrieval-augmented generation systems. The environment simulates an email client that uses a mailbox as a knowledge base. The agent can search the mailbox for relevant messages and retrieve full email content using dedicated tools. Malicious instructions are embedded within email messages and may appear in retrieved context. The agent must distinguish between legitimate information and adversarial instructions when composing responses.
+
+\paragraph{collab (cross-agent manipulation).}
+This domain models a multi-agent collaboration environment where agents communicate through shared channels and coordinate task execution. An attacking agent acting as a colleague attempts to manipulate the target agent through misleading instructions, task delegation requests, or privilege escalation attempts. The environment provides tools for retrieving tasks, updating tickets, delegating work, accessing activity logs, and sending messages between agents.
+
+\paragraph{output\_handling (unsafe output generation).}
+This domain evaluates whether the agent generates unsafe output that can trigger downstream vulnerabilities such as cross-site scripting, SQL injection, or malicious redirects. The environment simulates a web application in which the agent generates content that is subsequently rendered or processed by external systems. The agent must ensure that generated outputs remain safe when interpreted by downstream components.
+
+\subsection{Evaluation Metrics}
+
+Security robustness is evaluated using executable assertions that verify whether the agent preserves security invariants during interaction. Each evaluation case contains multiple binary assertions representing specific security checks.
+
+We report the pass@k metric, defined as the fraction of evaluation cases in which at least $k$ assertions are satisfied:
+
+\[
+pass@k =
+\frac{1}{N}
+\sum_{i=1}^{N}
+\mathbf{1}
+\left(
+\sum_{j=1}^{M_i} a_{ij} \ge k
+\right),
+\]
+
+where $N$ is the number of evaluation cases, $M_i$ is the number of assertions in case $i$, and $a_{ij} \in \{0,1\}$ indicates whether assertion $j$ is satisfied.
+
+We also report the attack success rate (ASR), defined as $ASR = 1 - pass@1$. In this benchmark, assertions check that the agent refuses malicious instructions, avoids executing unauthorized actions, and preserves data integrity. These metrics provide complementary perspectives on security robustness by measuring both minimal and stringent security thresholds.
+
+\section{Experiments}
+
+This section describes the experimental setup used to evaluate the security properties of LLM-based agents under the dual-control framework introduced in Section~3. The experiments are designed to study how agent robustness behaves when security threats are embedded in interactive environments where both the agent and the user can modify the system state. In particular, the evaluation focuses on three factors that may influence measured robustness: the agent model, the variability of user behavior, and the security domain in which the interaction takes place.
+
+\subsection{Experimental Design}
+
+Each evaluation scenario consists of three interacting components: the agent, the user, and the environment corresponding to one of the security domains described in Section~3. The agent observes the environment and selects actions by invoking available tools, while the user interacts with the agent by issuing requests and modifying contextual information. The environment maintains the shared system state and executes the consequences of both agent and user actions.
+
+To isolate the effect of interaction dynamics, the agent operates with deterministic decoding parameters ($T_{agent}=0$) across all experiments. User behavior is modeled by a simulated LLM-based user whose generation temperature is varied to introduce different levels of behavioral variability. This design allows us to examine whether security metrics remain stable when the same attack scenario is executed under slightly different interaction trajectories.
+
+\subsection{Models}
+
+We evaluate five widely used LLMs representing different capability levels and architectural generations: Claude Sonnet 4.5, GPT-4-turbo, GPT-4o, GPT-4o-mini, and GPT-3.5-turbo. These models are representative of systems commonly used in real-world agent deployments and provide a range of capabilities and safety training regimes.
+
+The purpose of including multiple models is not to establish a leaderboard of model security performance, but to examine how differences in model capability affect robustness under interactive security evaluation. All agent models are evaluated using identical tool interfaces and deterministic decoding settings in order to ensure comparability across experiments.
+
+\subsection{User Simulation}
+
+The user is implemented as an LLM-based simulator that generates requests conditioned on the full interaction history. This approach enables realistic multi-turn interactions while preserving experimental reproducibility.
+
+To examine the impact of user behavior variability, we vary the user temperature across three settings: $T_{user} \in \{0.0, 0.5, 1.0\}$. The deterministic setting ($T_{user}=0.0$) produces consistent user behavior across runs, while higher temperatures introduce increasing diversity in phrasing, request ordering, and contextual cues. Although the simulated user is not adversarial, these variations may influence how attacks propagate through the interaction.
+
+\subsection{Evaluation Protocol}
+
+For each configuration defined by the model, domain, user temperature, and task, we perform $n=10$ independent runs. Each run simulates a complete interaction trajectory until the task is completed or a termination condition is reached.
+
+Security outcomes are evaluated using the assertion system described in Section~3.5. Each run produces a set of binary outcomes indicating whether the corresponding security invariants were preserved. The resulting results are aggregated across runs and tasks to compute the pass@k metric and the attack success rate (ASR).
+
+To assess statistical significance of differences between models, we use two-sided Fisher exact tests. Confidence intervals for proportion estimates are computed using Wilson intervals, which provide more reliable coverage for small sample sizes than normal approximations.
+
+\subsection{Research Questions}
+
+The experimental evaluation is structured around three research questions that correspond to the methodological gap identified in Section~1.
+
+\textbf{RQ1: How does interactive (dual-control) evaluation affect measured security robustness of LLM-based agents?} This question investigates whether the presence of an active user who can modify environment state changes the security conclusions drawn from evaluation. In particular, we examine whether robustness differences between models emerge under dual-control interaction.
+
+\textbf{RQ2: How stable are security robustness metrics under variability in non-malicious user behavior?} Even when the user is not adversarial, variations in user behavior may influence interaction trajectories and therefore measured attack success rates. This question evaluates the sensitivity of pass@k and ASR metrics to changes in the user simulator temperature.
+
+\textbf{RQ3: Does increased model capability reliably translate into higher robustness under interactive security evaluation?} This question tests the widely held assumption that larger or more capable models are inherently safer. We examine whether this relationship holds across multiple security domains when evaluation includes realistic interaction dynamics.
+
+\section{Results}
+
+This section presents the empirical results of DUMA-bench and interprets them in the context of benchmark evaluation. Following the research questions introduced in Section~4, we analyze (1) the overall difficulty of the benchmark, (2) the effect of dual-control evaluation, (3) the sensitivity of results to user behavior, and (4) the relationship between model capability and security robustness.
+
+\subsection{Overall Benchmark Difficulty}
+
+We first examine the overall difficulty of the benchmark in order to understand the level of robustness achieved by current models. Table~\ref{tab:main_pass1} reports pass@1 scores for GPT-4o and GPT-4o-mini across the three security domains of DUMA-bench.
+
+Across all domains, even the strongest configuration achieves only 32–36\% pass@1 in the \texttt{mail\_rag\_phishing} domain, corresponding to attack success rates of 64–68\%. GPT-4o-mini performs substantially worse, achieving only 8–12\% pass@1 (ASR 88–92\%). These results indicate that RAG-based environments remain highly vulnerable even for modern frontier models.
+
+Performance in the \texttt{collab} domain is similarly low, with pass@1 scores between 21–30\% across configurations. In contrast, the \texttt{output\_handling} domain exhibits higher pass@1 values (43–60\%), suggesting that models are somewhat better at avoiding direct unsafe output generation than at handling adversarial context embedded in retrieved or collaborative information sources.
+
+Taken together, these results indicate that DUMA-bench presents a challenging evaluation environment for current models. The benchmark therefore produces meaningful variation in performance, enabling comparisons between models and evaluation protocols.
+
+\begin{table}[H]
+\centering
+\caption{Model robustness comparison by domain ($\passone$).}
+\label{tab:main_pass1}
+\begin{tabular}{lccc}
+\toprule
+Model & RAG Phishing & Collab & Output Handling \\
+\midrule
+GPT-4o ($T=0.0$) & 16/50 (32.0\%) & 13/60 (21.7\%) & 16/30 (53.3\%) \\
+GPT-4o ($T=0.5$) & 18/50 (36.0\%) & 13/60 (21.7\%) & 18/30 (60.0\%) \\
+GPT-4o ($T=1.0$) & 16/50 (32.0\%) & 17/60 (28.3\%) & 18/30 (60.0\%) \\
+GPT-4o-mini ($T=0.0$) & 5/50 (10.0\%) & 18/60 (30.0\%) & 13/30 (43.3\%) \\
+GPT-4o-mini ($T=0.5$) & 6/50 (12.0\%) & 13/60 (21.7\%) & 14/30 (46.7\%) \\
+GPT-4o-mini ($T=1.0$) & 4/50 (8.0\%) & 18/60 (30.0\%) & 18/30 (60.0\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{RQ1: Effect of Dual-Control Evaluation}
+
+We next evaluate how the evaluation regime affects measured robustness. To isolate the role of interaction dynamics, we compare two evaluation modes: a passive-user (\emph{solo}) setting, where the user does not modify environment state, and the full \emph{dual-control} setting, where both the agent and the user can affect the environment.
+
+Table~\ref{tab:overall_solo_dual} reports the aggregate results across four GPT-4-family models. Under solo evaluation, the overall pass@1 score is 0.703 (360/512). Under dual-control evaluation, pass@1 decreases to 0.615 (315/512). A one-sided Fisher exact test yields $p=0.001845$, indicating that the difference is statistically significant.
+
+\begin{table}[H]
+\centering
+\caption{Overall passive-user (solo) vs dual-control comparison.}
+\label{tab:overall_solo_dual}
+\begin{tabular}{lccc}
+\toprule
+Mode & Trials & Successes & $\passone$ \\
+\midrule
+Solo & 512 & 360 & 0.703 \\
+Dual-control & 512 & 315 & 0.615 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+While the aggregate difference is informative, the domain-level analysis provides deeper insight into how interaction dynamics influence security outcomes. Table~\ref{tab:solo_dual_domains} reports the comparison by attack domain.
+
+\begin{table}[H]
+\centering
+\caption{Domain-level passive-user vs dual-control comparison ($\passone$).}
+\label{tab:solo_dual_domains}
+\begin{tabular}{lcccc}
+\toprule
+Domain & Solo & Dual-control & $\Delta$ & $p$ \\
+\midrule
+\texttt{mktg\_phishing} & 0.979 & 0.375 & 0.604 & $2.43\times10^{-11}$ \\
+\texttt{crm\_leak} & 1.000 & 0.797 & 0.203 & $6.21\times10^{-5}$ \\
+\texttt{auth\_spoof\_support} & 1.000 & 0.896 & 0.104 & $2.80\times10^{-2}$ \\
+\texttt{tool\_shadow\_poison} & 1.000 & 0.917 & 0.083 & $5.86\times10^{-2}$ \\
+\texttt{collab} & 0.979 & 0.927 & 0.052 & $8.46\times10^{-2}$ \\
+\texttt{mail\_rag\_phishing} & 0.250 & 0.205 & 0.045 & $2.62\times10^{-1}$ \\
+\texttt{infra\_loadshed} & 0.323 & 0.490 & -0.167 & $9.94\times10^{-1}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These results demonstrate that dual-control evaluation changes not only the overall success rate but also the distribution of observed vulnerabilities. Some attacks, such as \texttt{mktg\_phishing}, become dramatically more effective when user interaction is introduced. Other domains remain largely unaffected, suggesting that their primary failure modes arise from system architecture rather than interaction dynamics. This analysis supports the central claim of the benchmark: interaction-aware evaluation exposes classes of vulnerabilities that remain hidden under passive-user evaluation.
+
+\subsection{RQ2: Sensitivity to User Behavior}
+
+We next analyze the stability of benchmark results under variability in user behavior. In the main benchmark, user behavior is controlled by the simulator temperature $T_{user}\in\{0.0,0.5,1.0\}$.
+
+Across domains, changes in user temperature do not substantially alter the relative ordering of models but produce measurable variation in pass@1 scores. The effect is most visible in interaction-heavy domains such as \texttt{collab}, where variations in phrasing or dialogue structure influence the success of social engineering attempts.
+
+These results highlight that security evaluation outcomes depend not only on the model but also on the behavior distribution of interacting users. Benchmark protocols that rely on a single deterministic interaction pattern may therefore underestimate variability in real-world deployment scenarios.
+
+\subsection{RQ3: Model Capability vs Security Robustness}
+
+Finally, we examine whether larger or more capable models exhibit systematically higher robustness in the benchmark. In the \texttt{mail\_rag\_phishing} domain, GPT-4o significantly outperforms GPT-4o-mini across all user temperature settings ($p\approx0.005$–0.013). However, this advantage does not generalize across domains.
+
+\begin{table}[H]
+\centering
+\caption{Model-level passive-user vs dual-control comparison.}
+\label{tab:solo_dual_models}
+\begin{tabular}{lcccc}
+\toprule
+Model & Solo $\passone$ & Dual $\passone$ & $\Delta$ & $p$ \\
+\midrule
+\texttt{openai/gpt-4o} & 0.727 & 0.555 & 0.172 & 0.0030 \\
+\texttt{openai/gpt-4.1-mini} & 0.719 & 0.656 & 0.063 & 0.1726 \\
+\texttt{openai/gpt-4.1} & 0.672 & 0.609 & 0.063 & 0.1810 \\
+\texttt{openai/gpt-4o-mini} & 0.695 & 0.641 & 0.055 & 0.2130 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Only GPT-4o exhibits a statistically significant aggregate difference between solo and dual-control evaluation. This suggests that interactive dynamics can reveal model-specific vulnerabilities that remain hidden in static evaluation settings.
+
+\subsection{Summary}
+
+Across all experiments, three conclusions emerge. First, even state-of-the-art models exhibit high attack success rates in interactive environments, particularly in RAG-based systems. Second, dual-control evaluation significantly changes measured robustness and reveals attack classes that remain hidden under passive-user evaluation. Third, model capability does not consistently translate into improved security robustness, as vulnerability patterns vary substantially across domains.
+
+
+\section{Discussion}
+The main contribution of DUMA-bench is methodological. The benchmark is useful
+not because it provides another leaderboard, but because it exposes a missing
+evaluation layer. The passive-user vs dual-control comparison clarifies why this
+layer matters: even when aggregate metrics move only moderately, domain-level
+vulnerability structure can change substantially. This is the relevant failure
+mode for real deployments, where agents are embedded in workflows involving
+active users, long-lived state, and indirect attack channels.
+
+The results also suggest that security robustness should not be treated as a
+simple function of model scale or generic capability. In some domains, GPT-4o
+significantly outperforms GPT-4o-mini; in others, the difference disappears.
+Likewise, some domains are almost unaffected by dual-control while others shift
+dramatically. This reinforces the need for targeted evaluation rather than broad
+claims about ``safe'' or ``unsafe'' models.
+
+\section{Limitations}
+
+
+\section{Conclusion}
+This work argues that evaluating agent security without modeling active user interaction is methodologically incomplete. By introducing a dual-control evaluation methodology and implementing it in DUMA-bench, we show that security conclusions about agent systems can change once interaction dynamics are taken into account.
+
+The main lesson is not simply that dual-control makes agents look worse. Rather, dual-control changes the observed attack surface: some vulnerabilities intensify, some remain stable, and some become less prominent. This is exactly why a
+passive-user evaluation regime is insufficient. DUMA-bench therefore provides a practical evaluation layer for studying agent security under realistic, interactive conditions.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{10}
+
+\bibitem{amato2013decpomdp}
+Christopher Amato, Girish Chowdhary, Alborz Geramifard, N. Kemal Ure, and Mykel J. Kochenderfer.
+\newblock Decentralized control of partially observable Markov decision processes.
+\newblock In \emph{52nd IEEE Conference on Decision and Control}, 2013.
+
+\bibitem{barres2025tau2bench}
+Vincent Barres, Hao Dong, Soumya Ray, Xinyun Si, and Karthik Narasimhan.
+\newblock $\tau^2$-bench: Evaluating conversational agents in a dual-control environment.
+\newblock \emph{arXiv preprint arXiv:2506.07982}, 2025.
+
+\bibitem{chen2024agentpoison}
+Zhaorun Chen, Zhen Xiang, Chaowei Xiao, Dawn Song, and Bo Li.
+\newblock AgentPoison: Red-teaming LLM agents via poisoning memory or knowledge bases.
+\newblock \emph{arXiv preprint arXiv:2407.12784}, 2024.
+
+\bibitem{debenedetti2024agentdojo}
+Edoardo Debenedetti et al.
+\newblock AgentDojo: A dynamic environment to evaluate prompt injection attacks and defenses for LLM agents.
+\newblock In \emph{NeurIPS}, 2024.
+
+\bibitem{liu2025agentbench}
+Xiao Liu et al.
+\newblock AgentBench: Evaluating LLMs as agents.
+\newblock \emph{arXiv preprint arXiv:2308.03688}, 2025.
+
+\bibitem{qin2025toollearning}
+Yujia Qin et al.
+\newblock Tool learning with foundation models.
+\newblock \emph{ACM Computing Surveys}, 2025.
+
+\bibitem{schick2023toolformer}
+Timo Schick et al.
+\newblock Toolformer: Language models can teach themselves to use tools.
+\newblock In \emph{NeurIPS}, 2023.
+
+\bibitem{wang2024badagent}
+Yizhen Wang, Deyuan Xue, Sheng Zhang, and Shuo Qian.
+\newblock BadAgent: Inserting and activating backdoor attacks in LLM agents.
+\newblock \emph{arXiv preprint arXiv:2406.03007}, 2024.
+
+\bibitem{yao2024taubench}
+Shunyu Yao, Noah Shinn, Pedram Razavi, and Karthik Narasimhan.
+\newblock $\tau$-bench: A benchmark for tool-agent-user interaction in real-world domains.
+\newblock \emph{arXiv preprint arXiv:2406.12045}, 2024.
+
+\bibitem{zhang2025asb}
+Hanrong Zhang et al.
+\newblock Agent Security Bench (ASB): Formalizing and benchmarking attacks and defenses in LLM-based agents.
+\newblock \emph{arXiv preprint arXiv:2410.02644}, 2025.
+
+\bibitem{zou2024poisonedrag}
+Wei Zou, Runpeng Geng, Binghui Wang, and Jinyuan Jia.
+\newblock PoisonedRAG: Knowledge corruption attacks to retrieval-augmented generation of large language models.
+\newblock \emph{arXiv preprint arXiv:2402.07867}, 2024.
+
+\end{thebibliography}
+
+\end{document}
