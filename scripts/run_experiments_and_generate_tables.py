@@ -135,6 +135,7 @@ def run_all_experiments(
     agent_base_url: Optional[str] = None,  # Base URL для провайдера LLM
     api_key_env: Optional[str] = None,  # Имя переменной окружения для API ключа
     duma_max_concurrency: int = 1,  # Внутренняя параллельность duma run
+    agent_temperature: float = 0.0,  # Фиксированная температура агента
 ) -> Path:
     """
     Запустить все эксперименты.
@@ -211,9 +212,15 @@ def run_all_experiments(
     # Кэш для задач доменов, чтобы не загружать их многократно
     domain_tasks_cache = {}
 
+    # In solo mode there is no user, so the temperature loop is irrelevant;
+    # we run each model/domain/task once with agent_temperature.
+    # In dual-control mode, temperatures control the user simulator and
+    # agent_temperature is used for the agent.
+    user_temperatures = [agent_temperature] if solo else temperatures
+
     commands = []
     for model in models:
-        for temp in temperatures:
+        for user_temp in user_temperatures:
             for domain, tasks in domains.items():
                 # Если задачи не указаны, загрузить все задачи домена (с кэшированием)
                 if not tasks:
@@ -223,7 +230,7 @@ def run_all_experiments(
                     if not tasks:
                         print(f"Warning: No tasks found for domain {domain}, skipping")
                         continue
-                    if model == models[0] and temp == temperatures[0]:
+                    if model == models[0] and user_temp == user_temperatures[0]:
                         # Показываем только при первой загрузке
                         print(f"Loaded {len(tasks)} tasks for domain {domain}")
 
@@ -232,12 +239,12 @@ def run_all_experiments(
                     model_id = _model_id_for_results(model)
 
                     if solo:
-                        file_name = f"paper_results_solo_{domain}_{_sanitize_model_for_filename(model_id)}_T{temp}_{task}"
+                        file_name = f"paper_results_solo_{domain}_{_sanitize_model_for_filename(model_id)}_T{agent_temperature}_{task}"
                     else:
                         # Определяем модель пользователя
                         effective_user_llm = user_llm if user_llm else model
                         user_model_id = _model_id_for_results(effective_user_llm)
-                        file_name = f"paper_results_{domain}_{_sanitize_model_for_filename(model_id)}_U{_sanitize_model_for_filename(user_model_id)}_T{temp}_{task}"
+                        file_name = f"paper_results_{domain}_{_sanitize_model_for_filename(model_id)}_U{_sanitize_model_for_filename(user_model_id)}_UT{user_temp}_{task}"
 
                     # Фактический путь к файлу результата
                     output_file = actual_output_dir / f"{file_name}.json"
@@ -260,7 +267,7 @@ def run_all_experiments(
                             "--agent-llm",
                             model,
                             "--agent-llm-args",
-                            json.dumps({"temperature": temp}),
+                            json.dumps({"temperature": agent_temperature}),
                             "--num-trials",
                             str(num_trials),
                             "--task-ids",
@@ -279,10 +286,12 @@ def run_all_experiments(
                             domain,
                             "--agent-llm",
                             model,
+                            "--agent-llm-args",
+                            json.dumps({"temperature": agent_temperature}),
                             "--user-llm",
                             effective_user_llm,
                             "--user-llm-args",
-                            json.dumps({"temperature": temp}),
+                            json.dumps({"temperature": user_temp}),
                             "--num-trials",
                             str(num_trials),
                             "--task-ids",
@@ -1573,7 +1582,13 @@ def main():
         nargs="+",
         type=float,
         default=[0.0, 0.5, 1.0],
-        help="Температуры пользовательской модели (по умолчанию: 0.0, 0.5, 1.0)",
+        help="Температуры пользовательской модели (по умолчанию: 0.0, 0.5, 1.0). В solo-режиме игнорируется.",
+    )
+    parser.add_argument(
+        "--agent-temperature",
+        type=float,
+        default=0.0,
+        help="Фиксированная температура агента (по умолчанию: 0.0)",
     )
     parser.add_argument(
         "--domains",
@@ -1697,7 +1712,8 @@ def main():
         run_config = {
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "models": args.models,
-            "temperatures": args.temperatures,
+            "agent_temperature": args.agent_temperature,
+            "user_temperatures": args.temperatures,
             "domains": args.domains,
             "num_trials": args.num_trials,
             "user_llm": args.user_llm,
@@ -1726,6 +1742,7 @@ def main():
             agent_base_url=args.agent_base_url,
             api_key_env=args.api_key_env,
             duma_max_concurrency=args.duma_max_concurrency,
+            agent_temperature=args.agent_temperature,
         )
     else:
         print("Пропуск запуска экспериментов (--skip-experiments)")
@@ -1788,10 +1805,9 @@ def main():
             model_id = _model_id_for_results(model)
             file_model = _sanitize_model_for_filename(model_id)
             if args.solo:
-                for temp in args.temperatures:
-                    for task_id in domain_tasks:
-                        stem = f"paper_results_solo_{domain}_{file_model}_T{temp}_{task_id}"
-                        expected_files.append((results_dir / f"{stem}.json", task_id))
+                for task_id in domain_tasks:
+                    stem = f"paper_results_solo_{domain}_{file_model}_T{args.agent_temperature}_{task_id}"
+                    expected_files.append((results_dir / f"{stem}.json", task_id))
             else:
                 # Определяем модель пользователя
                 effective_user_llm = args.user_llm if args.user_llm else model
@@ -1799,7 +1815,7 @@ def main():
                 file_user_model = _sanitize_model_for_filename(user_model_id)
                 for temp in args.temperatures:
                     for task_id in domain_tasks:
-                        stem = f"paper_results_{domain}_{file_model}_U{file_user_model}_T{temp}_{task_id}"
+                        stem = f"paper_results_{domain}_{file_model}_U{file_user_model}_UT{temp}_{task_id}"
                         expected_files.append((results_dir / f"{stem}.json", task_id))
 
     missing_or_incomplete: list[str] = []
