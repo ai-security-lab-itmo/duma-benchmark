@@ -245,6 +245,110 @@ def _coerce_tool_call_arguments(
     return {}
 
 
+def _is_qwen_thinking_model(model: str) -> bool:
+    """Check if model is a Qwen thinking-capable model (Qwen3+)."""
+    model_l = model.lower()
+    return "qwen" in model_l and any(
+        v in model_l for v in ("qwen3", "qwen-3", "qwen3.5", "qwen-3.5")
+    )
+
+
+def _parse_text_tool_calls(
+    content: str,
+    available_tool_names: set[str] | None = None,
+) -> tuple[str | None, list[ToolCall] | None]:
+    """Parse tool calls embedded as plain text in the content field.
+
+    Some providers (e.g. DeepSeek V3 via certain proxies) return tool calls as
+    text in the ``content`` field instead of the standard ``tool_calls`` array.
+
+    Supported formats::
+
+        tool_call
+        function_name
+        {"arg": "value"}
+
+        tool_call_name
+        function_name
+        tool_call_arguments
+        {"arg": "value"}
+
+    Returns ``(remaining_content, parsed_tool_calls)`` where
+    ``parsed_tool_calls`` is ``None`` when no text tool calls are detected.
+    """
+    if not content:
+        return content, None
+
+    # Pattern 1: "tool_call\nname\n{json}" (possibly at start or after text)
+    pattern1 = re.compile(
+        r"(?:^|\n)tool_call\n([^\n]+)\n(\{.*?)(?=\ntool_call\n|\Z)",
+        re.DOTALL,
+    )
+    # Pattern 2: "tool_call_name\nname\ntool_call_arguments\n{json}"
+    pattern2 = re.compile(
+        r"(?:^|\n)tool_call_name\n([^\n]+)\ntool_call_arguments\n(\{.*?)(?=\ntool_call_name\n|\Z)",
+        re.DOTALL,
+    )
+
+    matches: list[tuple[str, str]] = []  # (name, json_str)
+    remaining = content
+
+    for pattern in (pattern2, pattern1):
+        found = list(pattern.finditer(remaining))
+        if found:
+            for m in found:
+                name = m.group(1).strip()
+                json_str = m.group(2).strip()
+                # Strip markdown code fences if present
+                if json_str.startswith("```json"):
+                    json_str = json_str[7:]
+                if json_str.startswith("```"):
+                    json_str = json_str[3:]
+                if json_str.endswith("```"):
+                    json_str = json_str[:-3]
+                json_str = json_str.strip()
+                matches.append((name, json_str))
+            # Remove matched spans from content
+            remaining = pattern.sub("", remaining).strip()
+            break
+
+    if not matches:
+        return content, None
+
+    # Optionally validate names against known tools
+    tool_calls: list[ToolCall] = []
+    for idx, (name, json_str) in enumerate(matches):
+        if available_tool_names and name not in available_tool_names:
+            logger.warning(
+                f"Text-parsed tool call '{name}' not in available tools "
+                f"{available_tool_names}. Keeping anyway."
+            )
+        try:
+            arguments = json.loads(json_str)
+            if not isinstance(arguments, dict):
+                arguments = {}
+        except json.JSONDecodeError:
+            logger.warning(
+                f"Text-parsed tool call '{name}' has invalid JSON arguments: "
+                f"{_short_repr(json_str)}. Falling back to {{}}."
+            )
+            arguments = {}
+        tool_calls.append(
+            ToolCall(
+                id=f"text_parsed_{name}_{idx}",
+                name=name,
+                arguments=arguments,
+            )
+        )
+
+    logger.info(
+        f"Parsed {len(tool_calls)} tool call(s) from text content: "
+        f"{[tc.name for tc in tool_calls]}"
+    )
+    final_content = remaining if remaining else None
+    return final_content, tool_calls
+
+
 def _should_retry_with_auto_tool_choice(
     error: Exception,
     tool_choice: Any,
@@ -305,7 +409,18 @@ def generate(
     ) and not ALLOW_SONNET_THINKING:
         kwargs["thinking"] = {"type": "disabled"}
 
+    # Qwen3+ models may have thinking mode enabled by default on some providers,
+    # which is incompatible with tool_choice="required".  Proactively disable
+    # thinking so that tool calling works without a costly retry.
+    if _is_qwen_thinking_model(normalized_model) and tools:
+        extra_body = kwargs.get("extra_body") or {}
+        extra_body.setdefault("enable_thinking", False)
+        kwargs["extra_body"] = extra_body
+
     litellm_messages = to_litellm_messages(messages)
+    available_tool_names: set[str] | None = None
+    if tools:
+        available_tool_names = {t.name for t in tools if hasattr(t, "name")}
     tools = [tool.openai_schema for tool in tools] if tools else None
     if tools and tool_choice is None:
         tool_choice = "auto"
@@ -438,6 +553,16 @@ def generate(
             )
         )
     tool_calls = tool_calls or None
+
+    # Fallback: parse tool calls embedded as plain text in content (e.g. DeepSeek V3
+    # via proxies that don't translate to OpenAI tool_calls format).
+    if tool_calls is None and content and has_tools:
+        parsed_content, parsed_tool_calls = _parse_text_tool_calls(
+            content, available_tool_names
+        )
+        if parsed_tool_calls:
+            content = parsed_content
+            tool_calls = parsed_tool_calls
 
     message = AssistantMessage(
         role="assistant",
