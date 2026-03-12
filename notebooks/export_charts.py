@@ -481,4 +481,138 @@ for di, domain in enumerate(domains_t):
     plt.tight_layout()
     savefig(fig, "B8_passk_vs_k_domain", f"passk_vs_k_{domain}")
 
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION C: Pass^k Tables by Domain (dual-control, temperature experiments)
+# ═══════════════════════════════════════════════════════════════════════════
+
+ks_full = [1, 2, 3, 4, 5]
+col_labels = [f"pass@{k}" for k in ks_full]
+
+# ── C1: pass^k by domain — one table per temperature ─────────────────────
+for t in temps_t:
+    print(f"[C1] pass^k by domain table (T={t})")
+    cell_text_m = []
+    for dom in domains_t:
+        p = task_rates_t.loc[
+            (task_rates_t.user_temp == t) & (task_rates_t.domain == dom), "p"
+        ].values
+        cell_text_m.append(
+            [f"{float(np.mean(p ** k)):.3f}" if len(p) > 0 else "—" for k in ks_full]
+        )
+    # Aggregate row
+    p_all = task_rates_t.loc[task_rates_t.user_temp == t, "p"].values
+    cell_text_m.append(
+        [f"{float(np.mean(p_all ** k)):.3f}" if len(p_all) > 0 else "—" for k in ks_full]
+    )
+    row_labels_m = list(domains_t) + ["ALL"]
+
+    n_r = len(row_labels_m)
+    fig_h = 1.2 + 0.45 * n_r
+    fig, ax = plt.subplots(figsize=(7, fig_h))
+    ax.axis("off")
+
+    tbl = ax.table(
+        cellText=cell_text_m, rowLabels=row_labels_m, colLabels=col_labels,
+        cellLoc="center", loc="center",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(11)
+    tbl.scale(1.0, 1.6)
+
+    for key, cell in tbl.get_celld().items():
+        cell.set_text_props(color="black")
+        cell.set_facecolor("white")
+        cell.set_edgecolor("#999999")
+    for j in range(len(col_labels)):
+        tbl[0, j].set_facecolor("#D9E2F3")
+        tbl[0, j].set_text_props(fontweight="bold")
+    for i in range(n_r):
+        tbl[i + 1, -1].set_facecolor("#F2F2F2")
+        tbl[i + 1, -1].set_text_props(fontweight="bold")
+    # ALL row background
+    for j in range(len(col_labels)):
+        tbl[n_r, j].set_facecolor("#F2F2F2")
+    # Highlight best domain per column (excluding ALL)
+    for ki in range(len(ks_full)):
+        vals = []
+        for di in range(len(domains_t)):
+            try:
+                vals.append(float(cell_text_m[di][ki]))
+            except ValueError:
+                vals.append(-1)
+        if vals:
+            best_di = int(np.argmax(vals))
+            tbl[best_di + 1, ki].set_facecolor("#FFF2CC")
+
+    ax.set_title(f"Pass@k by Domain (User T={t})", fontweight="bold", pad=14)
+    plt.tight_layout()
+    savefig(fig, "C1_passk_by_domain", f"passk_by_domain_T{t}")
+
+# ── C2: combined table — rows = T/domain, columns = pass@k ───────────────
+print("[C2] pass^k by domain table (all temperatures combined)")
+
+row_labels_all = []
+cell_text_all = []
+table_vals = {}  # (t, dom) -> [pass@1..5]
+for t in temps_t:
+    for dom in domains_t:
+        p = task_rates_t.loc[
+            (task_rates_t.user_temp == t) & (task_rates_t.domain == dom), "p"
+        ].values
+        vals = [float(np.mean(p ** k)) if len(p) > 0 else 0.0 for k in ks_full]
+        table_vals[(t, dom)] = vals
+        row_labels_all.append(f"T={t} / {dom}")
+        cell_text_all.append([f"{v:.3f}" for v in vals])
+
+n_rows = len(row_labels_all)
+n_cols = len(col_labels)
+n_dom = len(domains_t)
+
+fig_height = 1.4 + 0.4 * n_rows
+fig, ax = plt.subplots(figsize=(8, fig_height))
+ax.axis("off")
+
+tbl = ax.table(
+    cellText=cell_text_all, rowLabels=row_labels_all, colLabels=col_labels,
+    cellLoc="center", loc="center",
+)
+tbl.auto_set_font_size(False)
+tbl.set_fontsize(10)
+tbl.scale(1.0, 1.5)
+
+for key, cell in tbl.get_celld().items():
+    cell.set_text_props(color="black")
+    cell.set_facecolor("white")
+    cell.set_edgecolor("#999999")
+for j in range(n_cols):
+    tbl[0, j].set_facecolor("#D9E2F3")
+    tbl[0, j].set_text_props(fontweight="bold")
+
+# Alternate block background per temperature
+block_colors = ["#FFFFFF", "#F5F5F5", "#EAEAEA"]
+for ti, t in enumerate(temps_t):
+    bg = block_colors[ti % len(block_colors)]
+    for di in range(n_dom):
+        row_idx = ti * n_dom + di + 1
+        tbl[row_idx, -1].set_facecolor("#F2F2F2")
+        tbl[row_idx, -1].set_text_props(fontweight="bold")
+        if ti > 0:
+            for j in range(n_cols):
+                tbl[row_idx, j].set_facecolor(bg)
+
+# Highlight best temperature per domain/k
+for di, dom in enumerate(domains_t):
+    for ki in range(len(ks_full)):
+        vals_per_temp = [table_vals[(t, dom)][ki] for t in temps_t]
+        best_ti = int(np.argmax(vals_per_temp))
+        best_val = vals_per_temp[best_ti]
+        if best_val > min(vals_per_temp) + 1e-6:
+            row_idx = best_ti * n_dom + di + 1
+            tbl[row_idx, ki].set_facecolor("#FFF2CC")
+
+ax.set_title("Pass@k by Domain and User Temperature", fontweight="bold", pad=14)
+plt.tight_layout()
+savefig(fig, "C1_passk_by_domain", "passk_by_domain_all_temps")
+
+
 print("\nDone!")
