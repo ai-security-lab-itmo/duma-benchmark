@@ -1,10 +1,20 @@
 import json
 import os
+import random
 import re
-from typing import Any, Optional
+import time
+from typing import Any, Callable, Optional
 
 import litellm
-from litellm import completion, completion_cost
+from litellm import (
+    APIConnectionError,
+    InternalServerError,
+    RateLimitError,
+    ServiceUnavailableError,
+    Timeout,
+    completion,
+    completion_cost,
+)
 from litellm.caching.caching import Cache
 from litellm.main import ModelResponse, Usage
 from loguru import logger
@@ -19,6 +29,9 @@ from duma.config import (
     REDIS_PASSWORD,
     REDIS_PORT,
     REDIS_PREFIX,
+    RETRY_BASE_DELAY_SECONDS,
+    RETRY_JITTER_SECONDS,
+    RETRY_MAX_DELAY_SECONDS,
     USE_LANGFUSE,
 )
 from duma.data_model.message import (
@@ -30,7 +43,12 @@ from duma.data_model.message import (
     UserMessage,
 )
 from duma.environment.tool import Tool
-from duma.utils.model_ref import infer_provider, normalize_model_ref, to_litellm_model
+from duma.utils.model_ref import (
+    infer_provider,
+    is_reasoning_model,
+    normalize_model_ref,
+    to_litellm_model,
+)
 
 # litellm._turn_on_debug()
 
@@ -253,6 +271,144 @@ def _is_qwen_thinking_model(model: str) -> bool:
     )
 
 
+# Key aliases used by providers that serialize tool calls as JSON in the content
+# field (notably DeepSeek-v3.2 via proxies, which emit valid JSON objects rather than
+# the line-delimited text forms below).
+NAME_ALIASES = ("tool", "tool_name", "name", "function", "tool_call_name")
+ARG_ALIASES = ("args", "arguments", "parameters", "tool_call_arguments")
+
+
+def _strip_code_fence(text: str) -> str:
+    """Strip a leading ```json / ``` fence and trailing ``` from a string."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        if "\n" in stripped:
+            stripped = stripped.split("\n", 1)[-1]
+        else:
+            # Single-line fence: drop the ``` and any inline language tag (```json{...}).
+            stripped = re.sub(r"^[a-zA-Z0-9_+-]+", "", stripped[3:]).lstrip()
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
+    return stripped.strip()
+
+
+def _extract_name_and_args(obj: dict) -> tuple[str, dict] | None:
+    """Pull (name, args) out of a single tool-call dict, honouring key aliases.
+
+    Also handles the nested OpenAI form ``{"function": {"name": ..., "arguments": ...}}``
+    by recursing into a dict-valued alias.
+    """
+    # Nested form: an alias holds the actual {name, arguments} object.
+    for k in NAME_ALIASES:
+        value = obj.get(k)
+        if isinstance(value, dict):
+            inner = _extract_name_and_args(value)
+            if inner is not None:
+                return inner
+    name = next(
+        (
+            obj[k]
+            for k in NAME_ALIASES
+            if isinstance(obj.get(k), str) and obj[k].strip()
+        ),
+        None,
+    )
+    if name is None:
+        return None
+    raw_args = next((obj[k] for k in ARG_ALIASES if k in obj), {})
+    args = _coerce_tool_call_arguments(raw_args, tool_name=name)
+    return name.strip(), args
+
+
+def _json_object_is_tool_shaped(data: Any) -> bool:
+    """True if a parsed JSON object is an *executable* tool call.
+
+    Kept a strict subset of what ``_parse_json_object_tool_calls`` actually executes,
+    so an empty ``{"tool_calls": []}`` or a malformed ``{"name": 5}`` is NOT treated as
+    an (un-executed) tool call — otherwise the inert-run guard would wrongly flag and
+    exclude legitimate no-op replies.
+    """
+    if not isinstance(data, dict):
+        return False
+    tool_calls = data.get("tool_calls")
+    if isinstance(tool_calls, list):
+        return any(
+            isinstance(item, dict) and _extract_name_and_args(item) is not None
+            for item in tool_calls
+        )
+    return _extract_name_and_args(data) is not None
+
+
+def _parse_json_object_tool_calls(
+    content: str,
+    available_tool_names: set[str] | None = None,
+) -> list[ToolCall] | None:
+    """Parse tool calls emitted as a JSON object in the content field.
+
+    Handles the forms DeepSeek-v3.2 produces, e.g.::
+
+        {"tool_calls": [{"tool": "send_email", "args": {"to": "x"}}]}
+        {"tool_calls": [{"tool_name": "t", "arguments": {...}}]}
+        {"tool_call_name": "t", "tool_call_arguments": {...}}
+
+    Returns ``None`` for non-tool JSON such as ``{"message": "..."}`` reply wrappers.
+    """
+    stripped = _strip_code_fence(content)
+    if not (stripped.startswith("{") and stripped.endswith("}")):
+        return None
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+    if not _json_object_is_tool_shaped(data):
+        return None
+
+    if isinstance(data.get("tool_calls"), list):
+        raw_list = data["tool_calls"]
+    else:
+        # Single-object form: the whole dict describes one tool call.
+        raw_list = [data]
+
+    tool_calls: list[ToolCall] = []
+    for idx, item in enumerate(raw_list):
+        if not isinstance(item, dict):
+            logger.debug(f"Skipping non-dict tool_calls[{idx}]: {_short_repr(item)}")
+            continue
+        parsed = _extract_name_and_args(item)
+        if parsed is None:
+            logger.debug(f"Skipping unparseable tool_calls[{idx}]: {_short_repr(item)}")
+            continue
+        name, args = parsed
+        if available_tool_names and name not in available_tool_names:
+            logger.warning(
+                f"JSON-parsed tool call '{name}' not in available tools "
+                f"{available_tool_names}. Keeping anyway."
+            )
+        tool_calls.append(
+            ToolCall(id=f"json_parsed_{name}_{idx}", name=name, arguments=args)
+        )
+    return tool_calls or None
+
+
+def _looks_like_tool_call_text(content: Optional[str]) -> bool:
+    """Cheap predicate: does this assistant content *look like* an (un-executed) tool call?
+
+    Used by the orchestrator to flag inert runs where the agent emitted tool-call
+    text that was never executed. Returns False for ``{"message": ...}`` reply
+    wrappers and ordinary prose so legitimate no-action runs are not flagged.
+    """
+    if not content:
+        return False
+    stripped = _strip_code_fence(content)
+    if stripped.startswith("{") and stripped.endswith("}"):
+        try:
+            data = json.loads(stripped)
+        except json.JSONDecodeError:
+            return False
+        return _json_object_is_tool_shaped(data)
+    return bool(re.search(r"(?:^|\n)tool_call(?:_name)?\n", stripped))
+
+
 def _parse_text_tool_calls(
     content: str,
     available_tool_names: set[str] | None = None,
@@ -278,6 +434,16 @@ def _parse_text_tool_calls(
     """
     if not content:
         return content, None
+
+    # First try the JSON-object forms (DeepSeek-v3.2 and similar). On success the
+    # whole content was the tool call, so there is no remaining text.
+    json_tool_calls = _parse_json_object_tool_calls(content, available_tool_names)
+    if json_tool_calls:
+        logger.info(
+            f"Parsed {len(json_tool_calls)} tool call(s) from JSON content: "
+            f"{[tc.name for tc in json_tool_calls]}"
+        )
+        return None, json_tool_calls
 
     # Pattern 1: "tool_call\nname\n{json}" (possibly at start or after text)
     pattern1 = re.compile(
@@ -372,6 +538,68 @@ def _should_retry_with_auto_tool_choice(
     return has_tool_choice_marker and has_unsupported_marker and has_required_or_object
 
 
+_TRANSIENT_EXCEPTIONS = (
+    RateLimitError,
+    Timeout,
+    APIConnectionError,
+    ServiceUnavailableError,
+    InternalServerError,
+)
+_TRANSIENT_STATUS_CODES = {408, 409, 429}
+
+
+def _is_transient_llm_error(exc: Exception) -> bool:
+    """Classify whether an LLM error is worth retrying.
+
+    Transient: rate limits, timeouts, connection drops, 5xx, and 408/409/429.
+    Permanent (never retried): 400/401/403/404, context-window overflow, etc.
+
+    Classification is done on the ``status_code`` attribute regardless of exception
+    class. litellm's typed 5xx exceptions (InternalServerError, BadGatewayError, ...)
+    descend from ``openai.APIError``, NOT ``litellm.exceptions.APIError``, so an
+    isinstance check against the latter would silently miss real provider 5xx errors.
+    """
+    if isinstance(exc, _TRANSIENT_EXCEPTIONS):
+        return True
+    status = getattr(exc, "status_code", None)
+    if status is not None:
+        try:
+            status = int(status)
+        except (TypeError, ValueError):
+            return False
+        return status in _TRANSIENT_STATUS_CODES or 500 <= status < 600
+    return False
+
+
+def _completion_with_retry(
+    call: Callable[[], Any],
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> Any:
+    """Run ``call`` with bounded exponential backoff + jitter on transient errors.
+
+    A single transient API blip must not kill an entire simulation run, so we retry
+    here (the only place the typed litellm exceptions exist) before the error
+    propagates to the orchestrator and becomes fatal. Permanent errors re-raise
+    immediately.
+    """
+    max_retries = max(0, max_retries)
+    for attempt in range(max_retries + 1):
+        try:
+            return call()
+        except Exception as exc:  # noqa: BLE001 — re-raised below if not retryable
+            if attempt >= max_retries or not _is_transient_llm_error(exc):
+                raise
+            delay = min(
+                RETRY_BASE_DELAY_SECONDS * (2**attempt),
+                RETRY_MAX_DELAY_SECONDS,
+            ) + random.uniform(0, RETRY_JITTER_SECONDS)
+            logger.warning(
+                f"Transient LLM error (attempt {attempt + 1}/{max_retries + 1}): "
+                f"{type(exc).__name__}: {exc}. Retrying in {delay:.1f}s."
+            )
+            time.sleep(delay)
+
+
 def generate(
     model: str,
     messages: list[Message],
@@ -391,8 +619,10 @@ def generate(
 
     Returns: A tuple containing the message and the cost.
     """
-    if kwargs.get("num_retries") is None:
-        kwargs["num_retries"] = DEFAULT_MAX_RETRIES
+    # We retry transient failures ourselves in _completion_with_retry (with backoff
+    # and a transient-vs-permanent classifier), so disable litellm's internal retries
+    # to avoid compounding (e.g. 3x3 attempts) and to keep permanent errors fast-fail.
+    kwargs.setdefault("num_retries", 0)
 
     normalized_model = normalize_model_ref(model)
     provider = infer_provider(
@@ -416,6 +646,13 @@ def generate(
         extra_body = kwargs.get("extra_body") or {}
         extra_body.setdefault("enable_thinking", False)
         kwargs["extra_body"] = extra_body
+
+    # OpenAI reasoning models (gpt-5 family, o-series) reject temperature != 1. The
+    # benchmark injects temperature=0 for every agent; strip it for these models.
+    # litellm.drop_params already handles this, but stripping explicitly makes the
+    # behaviour independent of that global flag.
+    if is_reasoning_model(normalized_model):
+        kwargs.pop("temperature", None)
 
     litellm_messages = to_litellm_messages(messages)
     available_tool_names: set[str] | None = None
@@ -458,8 +695,10 @@ def generate(
             )
         )
 
-        if provider == "openrouter" or openrouter_mode or (
-            isinstance(model, str) and model.startswith("openrouter/")
+        if (
+            provider == "openrouter"
+            or openrouter_mode
+            or (isinstance(model, str) and model.startswith("openrouter/"))
         ):
             # Convenience: allow reusing OPENAI_API_KEY as OPENROUTER_API_KEY.
             if (
@@ -481,12 +720,14 @@ def generate(
                 extra_headers.setdefault("HTTP-Referer", referer)
             kwargs["extra_headers"] = extra_headers
 
-        response = completion(
-            model=litellm_model,
-            messages=litellm_messages,
-            tools=tools,
-            tool_choice=tool_choice,
-            **kwargs,
+        response = _completion_with_retry(
+            lambda: completion(
+                model=litellm_model,
+                messages=litellm_messages,
+                tools=tools,
+                tool_choice=tool_choice,
+                **kwargs,
+            )
         )
     except Exception as e:
         if _should_retry_with_auto_tool_choice(
@@ -498,12 +739,14 @@ def generate(
                 f"Model/provider rejected tool_choice={tool_choice}. "
                 f"Retrying with tool_choice='auto'. Error: {e}"
             )
-            response = completion(
-                model=litellm_model,
-                messages=litellm_messages,
-                tools=tools,
-                tool_choice="auto",
-                **kwargs,
+            response = _completion_with_retry(
+                lambda: completion(
+                    model=litellm_model,
+                    messages=litellm_messages,
+                    tools=tools,
+                    tool_choice="auto",
+                    **kwargs,
+                )
             )
         else:
             logger.error(e)

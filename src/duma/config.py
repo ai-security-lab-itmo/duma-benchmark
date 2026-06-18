@@ -2,6 +2,14 @@ import os
 
 # SIMULATION
 DEFAULT_MAX_STEPS = 200
+# Dual-control conversations should not run away (an adversarial user can push a
+# correctly-refusing agent indefinitely). Cap dual runs well below the solo cap so
+# they terminate as MAX_STEPS / USER_STOP instead of burning tokens to 200 steps.
+# See docs/arr/dual_control_remediation_plan.md §1.4.
+DEFAULT_MAX_STEPS_DUAL = 50
+# The user simulator gives up (natural USER_STOP) after this many consecutive
+# unproductive turns (no tool activity), instead of looping to the step cap.
+DEFAULT_USER_GIVE_UP_TURNS = 6
 DEFAULT_MAX_ERRORS = 10
 DEFAULT_SEED = 300
 DEFAULT_MAX_CONCURRENCY = 3
@@ -24,7 +32,9 @@ DEFAULT_LLM_NL_ASSERTIONS_TEMPERATURE = 0.0
 DEFAULT_LLM_NL_ASSERTIONS_ARGS = {
     "temperature": DEFAULT_LLM_NL_ASSERTIONS_TEMPERATURE,
     "api_base": os.environ.get("EVALUATOR_API_BASE", "https://api.vsellm.ru/v1"),
-    "api_key": os.environ.get("EVALUATOR_API_KEY", os.environ.get("VSE_LLM_API_KEY", "")),
+    "api_key": os.environ.get(
+        "EVALUATOR_API_KEY", os.environ.get("VSE_LLM_API_KEY", "")
+    ),
 }
 
 DEFAULT_LLM_ENV_INTERFACE = "gpt-4.1"
@@ -33,8 +43,21 @@ DEFAULT_LLM_ENV_INTERFACE_ARGS = {"temperature": DEFAULT_LLM_ENV_INTERFACE_TEMPE
 
 # LITELLM
 DEFAULT_MAX_RETRIES = 3
-LLM_CACHE_ENABLED = False
-DEFAULT_LLM_CACHE_TYPE = "redis"
+# Orchestrator-level resilience: a single transient API error (429/5xx/timeout) on
+# agent OR user generation must not kill an entire run. generate() retries transient
+# failures with exponential backoff + jitter before the error becomes fatal.
+RETRY_BASE_DELAY_SECONDS = 1.0
+RETRY_MAX_DELAY_SECONDS = 30.0
+RETRY_JITTER_SECONDS = 0.5
+# Caching is opt-in via env (LLM_CACHE_ENABLED=true). Default cache type is "local"
+# (in-process, safe without external infra); set DEFAULT_LLM_CACHE_TYPE=redis to share
+# a prompt cache across the experiment runner's subprocesses.
+LLM_CACHE_ENABLED = os.environ.get("LLM_CACHE_ENABLED", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+DEFAULT_LLM_CACHE_TYPE = os.environ.get("DEFAULT_LLM_CACHE_TYPE", "local")
 
 # REDIS CACHE
 REDIS_HOST = "localhost"

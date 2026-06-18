@@ -308,6 +308,26 @@ class TerminationReason(str, Enum):
     TOO_MANY_ERRORS = "too_many_errors"
 
 
+class RunStatus(str, Enum):
+    """Validity/scoring status of a run, orthogonal to ``termination_reason``.
+
+    Used by the metrics layer to decide whether a trial belongs in the pass@k
+    denominator:
+
+    - ``EVALUATED``: ran to a natural end (user/agent stop) and was scored by policy.
+    - ``INCOMPLETE``: did not converge (max steps / behavioural loop) but was still
+      scored by the real evaluators rather than auto-zeroed. Kept in the denominator.
+    - ``ERRORED``: an infrastructure crash (API/proxy failure). Excluded from metrics.
+    - ``INVALID``: the run executed zero tools while emitting tool-call-shaped text
+      (e.g. a tool-call serialization mismatch). The reward is meaningless. Excluded.
+    """
+
+    EVALUATED = "evaluated"
+    INCOMPLETE = "incomplete"
+    ERRORED = "errored"
+    INVALID = "invalid"
+
+
 class SimulationRun(BaseModel):
     """
     Simulation run for the given task.
@@ -323,6 +343,14 @@ class SimulationRun(BaseModel):
     duration: float = Field(description="The duration of the simulation.")
     termination_reason: TerminationReason = Field(
         description="The reason for the termination of the simulation."
+    )
+    run_status: Optional[RunStatus] = Field(
+        description=(
+            "Validity/scoring status of the run (evaluated / incomplete / errored / "
+            "invalid). Distinct from termination_reason; used to exclude infra crashes "
+            "and measurement-invalid runs from reward metrics. None on legacy results."
+        ),
+        default=None,
     )
     agent_cost: Optional[float] = Field(
         description="The cost of the agent.", default=None
@@ -420,10 +448,15 @@ class Results(BaseModel):
                 "task_id": sim.task_id,
                 "trial": sim.trial,
                 "seed": sim.seed,
-                "reward": sim.reward_info.reward,
+                "reward": (
+                    sim.reward_info.reward if sim.reward_info is not None else None
+                ),
                 "agent_cost": sim.agent_cost,
                 "user_cost": sim.user_cost,
                 "termination_reason": sim.termination_reason,
+                "run_status": (
+                    sim.run_status.value if sim.run_status is not None else None
+                ),
                 "duration": sim.duration,
                 "num_messages": len(sim.messages),
                 "info_git_commit": self.info.git_commit,

@@ -37,6 +37,11 @@ class UserState(BaseModel):
 
     system_messages: list[SystemMessage]
     messages: list[APICompatibleMessage]
+    # Give-up bookkeeping: count consecutive turns where the agent repeated the same
+    # message (a stonewall), so the user can end the conversation naturally instead of
+    # looping to the step cap.
+    unproductive_turns: int = 0
+    last_agent_signature: Optional[str] = None
 
     def flip_roles(self) -> list[APICompatibleMessage]:
         """

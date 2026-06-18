@@ -1,4 +1,3 @@
-import json
 import time
 import uuid
 from collections import deque
@@ -24,6 +23,7 @@ from duma.environment.environment import Environment, EnvironmentInfo
 from duma.user.base import BaseUser, is_valid_user_history_message
 from duma.user.user_simulator import DummyUser, UserSimulator, UserState
 from duma.utils.llm_utils import get_cost
+from duma.utils.signatures import message_signature, tool_signature
 from duma.utils.utils import format_time, get_now
 
 
@@ -87,6 +87,11 @@ class Orchestrator:
             else None
         )
         self._recent_participant_signatures: deque[str] = deque(
+            maxlen=self.loop_guard_window if self.loop_guard_window > 0 else 1
+        )
+        # Prose-insensitive tool-call signatures, to catch loops where the agent
+        # repeats the same tool call while varying its surrounding text.
+        self._recent_tool_signatures: deque[str] = deque(
             maxlen=self.loop_guard_window if self.loop_guard_window > 0 else 1
         )
 
@@ -260,11 +265,15 @@ class Orchestrator:
 
     def _seed_loop_guard_from_history(self):
         self._recent_participant_signatures.clear()
+        self._recent_tool_signatures.clear()
         if self.loop_guard_window <= 0:
             return
         for msg in self.trajectory:
             if isinstance(msg, (AssistantMessage, UserMessage)):
-                self._recent_participant_signatures.append(self._message_signature(msg))
+                self._recent_participant_signatures.append(message_signature(msg))
+                tool_sig = tool_signature(msg)
+                if tool_sig is not None:
+                    self._recent_tool_signatures.append(tool_sig)
 
     def _mark_error(
         self, context: str, exc: Optional[Exception] = None, *, fatal: bool = False
@@ -278,32 +287,6 @@ class Orchestrator:
             self.done = True
             self.termination_reason = TerminationReason.TOO_MANY_ERRORS
             self.num_errors = max(self.num_errors, self.max_errors)
-
-    @staticmethod
-    def _normalize_text(text: Optional[str], max_len: int = 240) -> str:
-        if text is None:
-            return ""
-        normalized = " ".join(text.split()).strip().lower()
-        if len(normalized) > max_len:
-            return normalized[:max_len]
-        return normalized
-
-    def _message_signature(self, message: AssistantMessage | UserMessage) -> str:
-        tool_calls = message.tool_calls or []
-        tool_sig_parts = []
-        for tool_call in tool_calls:
-            try:
-                args = json.dumps(
-                    tool_call.arguments, sort_keys=True, ensure_ascii=True
-                )
-            except Exception:
-                args = str(tool_call.arguments)
-            if len(args) > 120:
-                args = args[:120]
-            tool_sig_parts.append(f"{tool_call.name}:{args}")
-        tool_sig = "|".join(tool_sig_parts)
-        content_sig = self._normalize_text(message.content)
-        return f"{message.role}|{content_sig}|{tool_sig}"
 
     def _check_message_token_guard(self, message: AssistantMessage | UserMessage):
         if self.max_completion_tokens_per_message is None:
@@ -324,20 +307,40 @@ class Orchestrator:
     def _check_loop_guard(self, message: AssistantMessage | UserMessage):
         if self.loop_guard_window <= 0:
             return
-        self._recent_participant_signatures.append(self._message_signature(message))
-        if len(self._recent_participant_signatures) < self.loop_guard_window:
-            return
-        unique_messages = len(set(self._recent_participant_signatures))
-        if unique_messages <= self.loop_guard_max_unique_messages:
-            recent_preview = " || ".join(list(self._recent_participant_signatures)[-4:])
-            self._mark_error(
-                (
-                    "Loop guard triggered: "
-                    f"{unique_messages} unique participant messages in the last "
-                    f"{self.loop_guard_window} messages. Recent={recent_preview}"
-                ),
-                fatal=True,
-            )
+        # Content-sensitive guard: near-identical participant turns.
+        self._recent_participant_signatures.append(message_signature(message))
+        if len(self._recent_participant_signatures) >= self.loop_guard_window:
+            unique_messages = len(set(self._recent_participant_signatures))
+            if unique_messages <= self.loop_guard_max_unique_messages:
+                recent_preview = " || ".join(
+                    list(self._recent_participant_signatures)[-4:]
+                )
+                self._mark_error(
+                    (
+                        "Loop guard triggered: "
+                        f"{unique_messages} unique participant messages in the last "
+                        f"{self.loop_guard_window} messages. Recent={recent_preview}"
+                    ),
+                    fatal=True,
+                )
+                return
+        # Prose-insensitive guard: the SAME tool call repeated with varied text
+        # (e.g. an agent re-sending the same verification code each turn). Strict —
+        # fires only when the whole window collapses to a single identical tool call,
+        # so legitimate alternation between a couple of (e.g. read-only) tools does not
+        # false-trigger an early termination.
+        tool_sig = tool_signature(message)
+        if tool_sig is not None:
+            self._recent_tool_signatures.append(tool_sig)
+            if (
+                len(self._recent_tool_signatures) >= self.loop_guard_window
+                and len(set(self._recent_tool_signatures)) <= 1
+            ):
+                self._mark_error(
+                    "Tool loop guard triggered: identical tool call repeated "
+                    f"{self.loop_guard_window} times.",
+                    fatal=True,
+                )
 
     def _append_participant_message(self, message: AssistantMessage | UserMessage):
         self.trajectory.append(message)

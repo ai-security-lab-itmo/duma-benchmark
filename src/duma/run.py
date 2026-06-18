@@ -8,6 +8,7 @@ from typing import Optional
 from loguru import logger
 
 from duma.agent.llm_agent import LLMAgent, LLMGTAgent, LLMSoloAgent
+from duma.config import DEFAULT_MAX_STEPS_DUAL
 from duma.data_model.simulation import (
     AgentInfo,
     Info,
@@ -19,6 +20,7 @@ from duma.data_model.simulation import (
 )
 from duma.data_model.tasks import Task
 from duma.environment.environment import Environment, EnvironmentInfo
+from duma.evaluator.crash_classifier import classify_run_status
 from duma.evaluator.evaluator import EvaluationType, evaluate_simulation
 from duma.metrics.agent_metrics import compute_metrics
 from duma.orchestrator.orchestrator import Orchestrator
@@ -97,7 +99,7 @@ def make_run_name(config: RunConfig) -> str:
 def run_domain(config: RunConfig, skip_save: bool = False) -> Results:
     """
     Run simulations for a domain
-    
+
     Args:
         config: RunConfig with domain settings
         skip_save: If True, don't save results to a file (used when called from run_domains)
@@ -163,23 +165,23 @@ def run_domain(config: RunConfig, skip_save: bool = False) -> Results:
 def run_domains(domains: list[str], config: RunConfig) -> MultiDomainResults:
     """
     Run simulations for multiple domains and save them in a single file.
-    
+
     Args:
         domains: List of domain names to run
         config: RunConfig with shared settings for all domains
-        
+
     Returns:
         MultiDomainResults containing results for all domains
     """
     if not domains:
         raise ValueError("At least one domain must be specified")
-    
+
     timestamp = get_now()
     multi_domain_results = MultiDomainResults(
         timestamp=timestamp,
         domains={},
     )
-    
+
     save_to = config.save_to
     if save_to is None:
         clean_llm_agent_name = config.llm_agent.split("/")[-1]
@@ -188,13 +190,13 @@ def run_domains(domains: list[str], config: RunConfig) -> MultiDomainResults:
         user_name = f"{config.user}_{clean_llm_user_name}"
         domains_str = "_".join(domains)
         save_to = f"{timestamp}_{domains_str}_{agent_name}_{user_name}"
-    
+
     save_to_path = DATA_DIR / "simulations" / f"{save_to}.json"
-    
+
     # Create parent directories if needed
     if not save_to_path.parent.exists():
         save_to_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Check if file exists
     if save_to_path.exists():
         response = (
@@ -208,17 +210,17 @@ def run_domains(domains: list[str], config: RunConfig) -> MultiDomainResults:
             raise FileExistsError(
                 f"File {save_to_path} already exists. Please delete it or use a different save_to name."
             )
-    
+
     # Initialize empty file
     multi_domain_results.save(save_to_path)
-    
+
     # Run each domain
     metrics_per_domain = {}
     for i, domain in enumerate(domains):
         ConsoleDisplay.console.print(
-            f"\n[bold cyan]Running domain {i+1}/{len(domains)}: {domain}[/bold cyan]\n"
+            f"\n[bold cyan]Running domain {i + 1}/{len(domains)}: {domain}[/bold cyan]\n"
         )
-        
+
         # Create domain-specific config
         domain_config = RunConfig(
             domain=domain,
@@ -239,23 +241,23 @@ def run_domains(domains: list[str], config: RunConfig) -> MultiDomainResults:
             seed=config.seed,
             log_level=config.log_level,
         )
-        
+
         # Run domain (skip individual file saving, will save to multi-domain file)
         domain_results = run_domain(domain_config, skip_save=True)
-        
+
         # Store results
         multi_domain_results.domains[domain] = domain_results
-        
+
         # Save after each domain (incremental save)
         multi_domain_results.save(save_to_path)
-        
+
         # Display metrics for this domain
         from duma.metrics.agent_metrics import compute_metrics
 
         metrics = compute_metrics(domain_results)
         metrics_per_domain[domain] = metrics
         ConsoleDisplay.display_agent_metrics(metrics)
-    
+
     # Aggregate metrics across domains
     if metrics_per_domain:
         # Average metrics; pass_hat_k averaged over domains where present
@@ -270,7 +272,9 @@ def run_domains(domains: list[str], config: RunConfig) -> MultiDomainResults:
 
         pass_k_avg = {k: sum(vs) / len(vs) for k, vs in aggregated_pass_k.items()}
 
-        ConsoleDisplay.console.print("\n[bold magenta]Aggregated metrics across domains[/bold magenta]")
+        ConsoleDisplay.console.print(
+            "\n[bold magenta]Aggregated metrics across domains[/bold magenta]"
+        )
         ConsoleDisplay.console.print(
             f"Average reward: {total_reward / count:.4f}\n"
             f"Success rate: {total_success / count:.4f}\n"
@@ -286,7 +290,7 @@ def run_domains(domains: list[str], config: RunConfig) -> MultiDomainResults:
         f"Results saved to: [bold blue]{save_to_path}[/bold blue]\n"
         f"To review the simulations, run: [bold blue]duma view --file {save_to_path}[/bold blue]"
     )
-    
+
     return multi_domain_results
 
 
@@ -610,13 +614,19 @@ def run_task(
         llm_args=llm_args_user,
     )
 
+    # Dual-control conversations are capped lower than solo so an adversarial user
+    # cannot push a correctly-refusing agent to the (much higher) solo step cap.
+    effective_max_steps = (
+        max_steps if solo_mode else min(max_steps, DEFAULT_MAX_STEPS_DUAL)
+    )
+
     orchestrator = Orchestrator(
         domain=domain,
         agent=agent,
         user=user,
         environment=environment,
         task=task,
-        max_steps=max_steps,
+        max_steps=effective_max_steps,
         max_errors=max_errors,
         seed=seed,
         solo_mode=solo_mode,
@@ -632,6 +642,9 @@ def run_task(
     )
 
     simulation.reward_info = reward_info
+    # Classify validity/scoring status (errored/incomplete/invalid/evaluated) so the
+    # metrics layer can exclude infra crashes and inert (zero-tool) runs.
+    simulation.run_status = classify_run_status(simulation)
 
     logger.info(
         f"FINISHED SIMULATION: Domain: {domain}, Task: {task.id}, Agent: {agent.__class__.__name__}, User: {user.__class__.__name__}. Reward: {reward_info.reward}"

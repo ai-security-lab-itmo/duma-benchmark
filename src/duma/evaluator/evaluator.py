@@ -1,7 +1,13 @@
 from enum import Enum
 
-from duma.data_model.simulation import RewardInfo, SimulationRun, TerminationReason
+from duma.data_model.simulation import (
+    RewardInfo,
+    RunStatus,
+    SimulationRun,
+    TerminationReason,
+)
 from duma.data_model.tasks import RewardType, Task
+from duma.evaluator.crash_classifier import classify_crash
 from duma.evaluator.evaluator_action import ActionEvaluator
 from duma.evaluator.evaluator_communicate import CommunicateEvaluator
 from duma.evaluator.evaluator_env import EnvironmentEvaluator
@@ -28,14 +34,24 @@ def evaluate_simulation(
     """
     Evaluate the simulation based on the evaluation type.
     """
-    if simulation.termination_reason in {
-        TerminationReason.TOO_MANY_ERRORS,
-        TerminationReason.MAX_STEPS,
-    }:
+    # Only infrastructure crashes (API/proxy failures) are auto-zeroed: their reward
+    # is meaningless and they are excluded from metrics via run_status=ERRORED. A
+    # MAX_STEPS non-convergence or a behavioural loop falls through to the real
+    # evaluators so a correctly-refusing agent is scored on policy, not auto-failed
+    # just because the adversarial user never gave up.
+    if (
+        simulation.termination_reason == TerminationReason.TOO_MANY_ERRORS
+        and classify_crash(simulation) == "infrastructure"
+    ):
         return RewardInfo(
             reward=0.0,
             info={
-                "note": f"Simulation terminated prematurely. Termination reason: {simulation.termination_reason}"
+                "note": (
+                    "Simulation terminated prematurely. Termination reason: "
+                    f"{simulation.termination_reason}"
+                ),
+                "run_status": RunStatus.ERRORED.value,
+                "crash_type": "infrastructure",
             },
         )
     if task.evaluation_criteria is None:

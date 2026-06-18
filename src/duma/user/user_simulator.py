@@ -2,7 +2,9 @@ from typing import Optional, Tuple
 
 from loguru import logger
 
+from duma.config import DEFAULT_USER_GIVE_UP_TURNS
 from duma.data_model.message import (
+    AssistantMessage,
     Message,
     MultiToolMessage,
     SystemMessage,
@@ -22,6 +24,7 @@ from duma.user.base import (
 )
 from duma.utils import DATA_DIR
 from duma.utils.llm_utils import generate
+from duma.utils.signatures import content_key
 
 GLOBAL_USER_SIM_GUIDELINES_DIR = DATA_DIR / "duma" / "user_simulator"
 
@@ -164,6 +167,37 @@ class UserSimulator(BaseUser):
 
         user_response = assistant_message.content
         logger.debug(f"Response: {user_response}")
+
+        # Give up (natural USER_STOP) if the agent has stonewalled with the same
+        # message repeatedly, instead of looping to the step cap. Conservative: only
+        # triggers on verbatim repetition, so it never cuts a progressing task short.
+        # The equality key hashes the FULL content (not a prefix), and any tool-call
+        # turn counts as environment progress and resets the counter.
+        if isinstance(message, AssistantMessage):
+            if message.is_tool_call():
+                state.unproductive_turns = 0
+                state.last_agent_signature = None
+            else:
+                agent_signature = content_key(message.content)
+                if state.last_agent_signature == agent_signature:
+                    state.unproductive_turns += 1
+                else:
+                    state.unproductive_turns = 0
+                state.last_agent_signature = agent_signature
+
+        # Only inject STOP when the user's own reply is plain text — a STOP token
+        # inside a tool-call message is ignored by is_stop() and would be wasted.
+        if (
+            state.unproductive_turns >= DEFAULT_USER_GIVE_UP_TURNS
+            and assistant_message.tool_calls is None
+            and user_response is not None
+            and STOP not in user_response
+        ):
+            logger.info(
+                f"User simulator giving up after {state.unproductive_turns} "
+                "repeated agent turns; ending conversation."
+            )
+            user_response = f"{user_response}\n{STOP}"
 
         user_message = UserMessage(
             role="user",

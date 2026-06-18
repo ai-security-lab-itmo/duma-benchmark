@@ -60,6 +60,27 @@ def normalize_model_ref(model: str | None) -> str:
     return value
 
 
+def is_reasoning_model(model: str | None) -> bool:
+    """Return True for OpenAI reasoning models (gpt-5 family, o1/o3/o4 series).
+
+    These models reject ``temperature`` values other than the default (1); the
+    benchmark sends ``temperature=0`` to every agent, so it must be stripped for
+    them. Matching is done on the canonical (vendor-stripped) model id.
+    """
+    if not model:
+        return False
+    canonical = normalize_model_ref(model).lower()
+    # Drop a leading ``vendor/`` so ``openai/gpt-5-mini`` -> ``gpt-5-mini``.
+    bare = canonical.split("/", 1)[1] if "/" in canonical else canonical
+    if bare.startswith("gpt-5"):
+        return True
+    # o1 / o3 / o4 reasoning series, e.g. "o3-mini", "o1", "o4-mini".
+    for prefix in ("o1", "o3", "o4"):
+        if bare == prefix or bare.startswith(f"{prefix}-"):
+            return True
+    return False
+
+
 def infer_provider(
     model: str | None,
     api_base: str | None = None,
@@ -103,4 +124,3 @@ def to_litellm_model(model: str | None, provider: str) -> str:
 def normalize_for_reporting(model: str | None) -> str:
     """Normalize model names for metrics/reporting comparisons."""
     return normalize_model_ref(model)
-

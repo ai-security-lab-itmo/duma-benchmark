@@ -19,7 +19,41 @@ def _sim(termination_reason=TerminationReason.AGENT_STOP):
     return SimpleNamespace(termination_reason=termination_reason, messages=[])
 
 
-def test_evaluate_simulation_returns_zero_on_premature_termination():
+def test_evaluate_simulation_zeroes_infrastructure_crash():
+    # A TOO_MANY_ERRORS run with no real exchange (messages=[]) is an infra crash and
+    # is auto-zeroed + flagged errored (excluded from metrics downstream).
+    reward_info = evaluate_simulation(
+        simulation=_sim(TerminationReason.TOO_MANY_ERRORS),
+        task=_task_with_basis([RewardType.DB]),
+        evaluation_type=EvaluationType.ALL,
+        solo_mode=False,
+        domain="collab",
+    )
+    assert reward_info.reward == 0.0
+    assert reward_info.info.get("run_status") == "errored"
+
+
+def test_evaluate_simulation_scores_max_steps_by_policy(monkeypatch):
+    # MAX_STEPS non-convergence must NOT be auto-zeroed; it is scored by the real
+    # evaluators so a correctly-behaving agent is not failed for a stubborn user.
+    monkeypatch.setattr(
+        "duma.evaluator.evaluator.EnvironmentEvaluator.calculate_reward",
+        lambda **kwargs: RewardInfo(
+            reward=0.5, reward_breakdown={RewardType.DB: 0.5}, db_check=None
+        ),
+    )
+    monkeypatch.setattr(
+        "duma.evaluator.evaluator.ActionEvaluator.calculate_reward",
+        lambda **kwargs: RewardInfo(
+            reward=1.0, reward_breakdown={RewardType.ACTION: 1.0}
+        ),
+    )
+    monkeypatch.setattr(
+        "duma.evaluator.evaluator.CommunicateEvaluator.calculate_reward",
+        lambda **kwargs: RewardInfo(
+            reward=1.0, reward_breakdown={RewardType.COMMUNICATE: 1.0}
+        ),
+    )
     reward_info = evaluate_simulation(
         simulation=_sim(TerminationReason.MAX_STEPS),
         task=_task_with_basis([RewardType.DB]),
@@ -27,7 +61,7 @@ def test_evaluate_simulation_returns_zero_on_premature_termination():
         solo_mode=False,
         domain="collab",
     )
-    assert reward_info.reward == 0.0
+    assert reward_info.reward == 0.5
 
 
 def test_evaluate_simulation_combines_selected_reward_components(monkeypatch):
@@ -49,9 +83,7 @@ def test_evaluate_simulation_combines_selected_reward_components(monkeypatch):
             reward=0.7, reward_breakdown={RewardType.COMMUNICATE: 0.7}
         ),
     )
-    task = _task_with_basis(
-        [RewardType.DB, RewardType.ACTION, RewardType.COMMUNICATE]
-    )
+    task = _task_with_basis([RewardType.DB, RewardType.ACTION, RewardType.COMMUNICATE])
     reward_info = evaluate_simulation(
         simulation=_sim(),
         task=task,
@@ -72,7 +104,9 @@ def test_evaluate_simulation_raises_when_nl_basis_not_enabled(monkeypatch):
     )
     monkeypatch.setattr(
         "duma.evaluator.evaluator.ActionEvaluator.calculate_reward",
-        lambda **kwargs: RewardInfo(reward=1.0, reward_breakdown={RewardType.ACTION: 1.0}),
+        lambda **kwargs: RewardInfo(
+            reward=1.0, reward_breakdown={RewardType.ACTION: 1.0}
+        ),
     )
     monkeypatch.setattr(
         "duma.evaluator.evaluator.CommunicateEvaluator.calculate_reward",
@@ -98,7 +132,9 @@ def test_evaluate_simulation_all_with_nl_includes_nl_reward(monkeypatch):
     )
     monkeypatch.setattr(
         "duma.evaluator.evaluator.ActionEvaluator.calculate_reward",
-        lambda **kwargs: RewardInfo(reward=1.0, reward_breakdown={RewardType.ACTION: 1.0}),
+        lambda **kwargs: RewardInfo(
+            reward=1.0, reward_breakdown={RewardType.ACTION: 1.0}
+        ),
     )
     monkeypatch.setattr(
         "duma.evaluator.evaluator.CommunicateEvaluator.calculate_reward",
@@ -134,7 +170,9 @@ def test_evaluate_simulation_all_with_nl_skips_nl_when_not_in_basis(monkeypatch)
     )
     monkeypatch.setattr(
         "duma.evaluator.evaluator.ActionEvaluator.calculate_reward",
-        lambda **kwargs: RewardInfo(reward=1.0, reward_breakdown={RewardType.ACTION: 1.0}),
+        lambda **kwargs: RewardInfo(
+            reward=1.0, reward_breakdown={RewardType.ACTION: 1.0}
+        ),
     )
     monkeypatch.setattr(
         "duma.evaluator.evaluator.CommunicateEvaluator.calculate_reward",
@@ -144,7 +182,9 @@ def test_evaluate_simulation_all_with_nl_skips_nl_when_not_in_basis(monkeypatch)
     )
 
     def _should_not_be_called(**kwargs):
-        raise AssertionError("NL evaluator should not be called when NL is not in basis")
+        raise AssertionError(
+            "NL evaluator should not be called when NL is not in basis"
+        )
 
     monkeypatch.setattr(
         "duma.evaluator.evaluator.NLAssertionsEvaluator.calculate_reward",

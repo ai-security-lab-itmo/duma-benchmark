@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.progress import Progress
 
 from duma.data_model.simulation import MultiDomainResults, Results
+from duma.evaluator.crash_classifier import classify_run_status
 from duma.evaluator.evaluator import EvaluationType, evaluate_simulation
 from duma.metrics.agent_metrics import compute_metrics
 from duma.utils.display import ConsoleDisplay
@@ -62,8 +63,11 @@ def compute_simulation_rewards(
                 solo_mode=solo_mode,
             )
 
-            # Update the simulation with new reward info
+            # Update the simulation with new reward info and validity status, so
+            # re-scored results exclude infra crashes / inert runs from metrics in
+            # parity with a live run (see run.run_task).
             simulation.reward_info = computed_reward_info
+            simulation.run_status = classify_run_status(simulation)
 
             if progress_context:
                 progress_context.update(task_progress, advance=1)
@@ -126,11 +130,13 @@ def evaluate_trajectories(
                     f"  📦 Multi-domain file with {len(multi_domain_results.domains)} domains",
                     style="cyan",
                 )
-                
+
                 # Process each domain
                 updated_domains = {}
                 for domain_name, domain_results in multi_domain_results.domains.items():
-                    console.print(f"    🔍 Processing domain: {domain_name}", style="dim")
+                    console.print(
+                        f"    🔍 Processing domain: {domain_name}", style="dim"
+                    )
                     updated_results = compute_simulation_rewards(
                         results=domain_results,
                         evaluation_type=evaluation_type,
@@ -140,13 +146,13 @@ def evaluate_trajectories(
                         f"    ✅ Computed rewards for {len(updated_results.simulations)} simulation(s)",
                         style="green",
                     )
-                    
+
                     # Display metrics
                     metrics = compute_metrics(updated_results)
                     ConsoleDisplay.display_agent_metrics(metrics)
-                    
+
                     updated_domains[domain_name] = updated_results
-                
+
                 # Save updated multi-domain results if output directory is provided
                 if output_dir:
                     input_filename = Path(file_path).name
@@ -157,11 +163,11 @@ def evaluate_trajectories(
                     )
                     updated_multi_domain.save(output_file)
                     console.print(f"  💾 Saved to: {output_file}", style="blue")
-                    
+
             except Exception:
                 # Fall back to single-domain Results format
                 results = Results.load(file_path)
-                
+
                 # Compute and update rewards (returns new Results object)
                 updated_results = compute_simulation_rewards(
                     results=results, evaluation_type=evaluation_type, console=console
