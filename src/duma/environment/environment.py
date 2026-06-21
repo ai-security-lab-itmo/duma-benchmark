@@ -295,10 +295,25 @@ class Environment:
                     tool_calls = message.tool_calls
                     for tc in tool_calls:
                         if len(messages) == 0:
-                            raise ValueError("Tool message expected. Got None.")
+                            # Truncated trajectory: the final agent message is an
+                            # un-executed tool call (e.g. a loop/token guard fired before
+                            # the environment produced the tool result). Skip the
+                            # unexecuted action instead of crashing the evaluator.
+                            logger.warning(
+                                "Trajectory ends on an unpaired tool call "
+                                f"({tc.name}); skipping the unexecuted action."
+                            )
+                            break
                         tm = messages.pop()
                         if not isinstance(tm, ToolMessage):
-                            raise ValueError(f"Tool message expected. Got {type(tm)}")
+                            # The tool call is followed by a non-tool message — put it
+                            # back and skip this unpaired call rather than crash.
+                            messages.append(tm)
+                            logger.warning(
+                                "Expected a tool message after tool call "
+                                f"{tc.name}, got {type(tm).__name__}; skipping."
+                            )
+                            break
                         if tc.id != tm.id:
                             raise ValueError(
                                 f"Tool call id mismatch. Got {tc.id} and {tm.id}"
