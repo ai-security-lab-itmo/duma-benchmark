@@ -2,6 +2,7 @@ import json
 import multiprocessing
 import random
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable, Optional
@@ -20,9 +21,11 @@ from duma.data_model.simulation import (
     Info,
     MultiDomainResults,
     Results,
+    RewardInfo,
     RunConfig,
     RunStatus,
     SimulationRun,
+    TerminationReason,
     UserInfo,
 )
 from duma.data_model.tasks import Task
@@ -79,6 +82,37 @@ def _run_with_retries(
         # excluded from metrics rather than aborting the whole sweep.
         return simulation
     raise last_exc  # every attempt raised
+
+
+def _make_errored_simulation(
+    task: Task, trial: int, seed: Optional[int], error: Exception
+) -> SimulationRun:
+    """Build a placeholder ERRORED simulation for a run that failed unrecoverably.
+
+    Lets the sweep record the failure and move on (the run is excluded from metrics
+    via run_status=ERRORED) instead of aborting every remaining task.
+    """
+    now = get_now()
+    return SimulationRun(
+        id=str(uuid.uuid4()),
+        task_id=task.id,
+        start_time=now,
+        end_time=now,
+        duration=0.0,
+        termination_reason=TerminationReason.TOO_MANY_ERRORS,
+        run_status=RunStatus.ERRORED,
+        reward_info=RewardInfo(
+            reward=0.0,
+            info={
+                "note": f"Run aborted by unrecoverable error: {error}",
+                "run_status": RunStatus.ERRORED.value,
+                "crash_type": "infrastructure",
+            },
+        ),
+        messages=[],
+        trial=trial,
+        seed=seed,
+    )
 
 
 def get_options() -> RegistryInfo:
@@ -548,8 +582,14 @@ def run_tasks(
                 ConsoleDisplay.display_simulation(simulation, show_details=False)
             _save(simulation)
         except Exception as e:
-            logger.error(f"Error running task {task.id}, trial {trial}: {e}")
-            raise e
+            # One unrecoverable failure must not abort the whole sweep: record it as an
+            # errored run (excluded from metrics) and continue with the other tasks.
+            logger.error(
+                f"Unrecoverable error running task {task.id}, trial {trial}; "
+                f"recording as errored and continuing: {e}"
+            )
+            simulation = _make_errored_simulation(task, trial, seed, e)
+            _save(simulation)
         return simulation
 
     args = []

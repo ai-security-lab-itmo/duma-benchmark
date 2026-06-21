@@ -29,13 +29,41 @@ DEFAULT_LLM_ARGS_USER = {"temperature": DEFAULT_LLM_TEMPERATURE_USER}
 
 DEFAULT_LLM_NL_ASSERTIONS = "openai/gpt-4o-mini"
 DEFAULT_LLM_NL_ASSERTIONS_TEMPERATURE = 0.0
+# The NL-assertions judge is NOT hardcoded to a specific proxy. It only pins an
+# endpoint when one is explicitly configured (env EVALUATOR_API_BASE/KEY, or the
+# duma run --evaluator-* flags via configure_nl_evaluator); otherwise generate()
+# routes it the same way as the agent/user (e.g. OpenRouter), avoiding a surprising
+# dependency on one (possibly flaky) proxy.
 DEFAULT_LLM_NL_ASSERTIONS_ARGS = {
     "temperature": DEFAULT_LLM_NL_ASSERTIONS_TEMPERATURE,
-    "api_base": os.environ.get("EVALUATOR_API_BASE", "https://api.vsellm.ru/v1"),
-    "api_key": os.environ.get(
-        "EVALUATOR_API_KEY", os.environ.get("VSE_LLM_API_KEY", "")
-    ),
 }
+_EVALUATOR_API_BASE = os.environ.get("EVALUATOR_API_BASE")
+_EVALUATOR_API_KEY = os.environ.get("EVALUATOR_API_KEY") or os.environ.get(
+    "VSE_LLM_API_KEY"
+)
+if _EVALUATOR_API_BASE:
+    DEFAULT_LLM_NL_ASSERTIONS_ARGS["api_base"] = _EVALUATOR_API_BASE
+if _EVALUATOR_API_KEY:
+    DEFAULT_LLM_NL_ASSERTIONS_ARGS["api_key"] = _EVALUATOR_API_KEY
+
+
+def configure_nl_evaluator(
+    llm: "str | None" = None,
+    api_base: "str | None" = None,
+    api_key: "str | None" = None,
+) -> None:
+    """Override the NL-assertions judge endpoint at runtime (e.g. from the CLI).
+
+    Called once before a run starts; the evaluator reads these globals at call time.
+    """
+    global DEFAULT_LLM_NL_ASSERTIONS
+    if llm:
+        DEFAULT_LLM_NL_ASSERTIONS = llm
+    if api_base:
+        DEFAULT_LLM_NL_ASSERTIONS_ARGS["api_base"] = api_base
+    if api_key:
+        DEFAULT_LLM_NL_ASSERTIONS_ARGS["api_key"] = api_key
+
 
 DEFAULT_LLM_ENV_INTERFACE = "gpt-4.1"
 DEFAULT_LLM_ENV_INTERFACE_TEMPERATURE = 0.0

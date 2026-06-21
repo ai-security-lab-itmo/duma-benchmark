@@ -5,6 +5,7 @@ import os
 from duma.config import (
     DEFAULT_AGENT_IMPLEMENTATION,
     DEFAULT_LLM_AGENT,
+    configure_nl_evaluator,
     DEFAULT_LLM_TEMPERATURE_AGENT,
     DEFAULT_LLM_TEMPERATURE_USER,
     DEFAULT_LLM_USER,
@@ -136,6 +137,27 @@ def add_run_args(parser):
         "--local-models",
         action="store_true",
         help="Use local models (skip injecting api_key/api_base).",
+    )
+    parser.add_argument(
+        "--evaluator-llm",
+        type=str,
+        default=None,
+        help="Override the NL-assertions judge model (default openai/gpt-4o-mini).",
+    )
+    parser.add_argument(
+        "--evaluator-base-url",
+        type=str,
+        default=None,
+        help=(
+            "Base URL for the NL-assertions judge endpoint. Overrides EVALUATOR_API_BASE; "
+            "point it at the same stable provider as the agent (e.g. OpenRouter)."
+        ),
+    )
+    parser.add_argument(
+        "--evaluator-api-key-env",
+        type=str,
+        default=None,
+        help="Env var name for the NL-assertions judge API key (e.g. OPENROUTER_API_KEY).",
     )
     parser.add_argument(
         "--task-set-name",
@@ -336,6 +358,18 @@ def main():
 
 def run_command(args):
     """Run command handler that supports both single and multi-domain runs."""
+    # Optionally point the NL-assertions judge at a specific (stable) endpoint, e.g.
+    # the same OpenRouter provider as the agent, instead of the default proxy.
+    eval_llm = getattr(args, "evaluator_llm", None)
+    eval_base = getattr(args, "evaluator_base_url", None)
+    eval_key_env = getattr(args, "evaluator_api_key_env", None)
+    if eval_llm or eval_base or eval_key_env:
+        configure_nl_evaluator(
+            llm=eval_llm,
+            api_base=eval_base,
+            api_key=os.getenv(eval_key_env) if eval_key_env else None,
+        )
+
     agent_llm_args = _build_llm_args(
         args.agent_llm,
         args.agent_llm_args,

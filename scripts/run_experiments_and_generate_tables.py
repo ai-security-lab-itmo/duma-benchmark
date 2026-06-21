@@ -66,6 +66,11 @@ def run_all_experiments(
     api_key_env: Optional[str] = None,  # Имя переменной окружения для API ключа
     duma_max_concurrency: int = 1,  # Внутренняя параллельность duma run
     agent_temperature: float = 0.0,  # Фиксированная температура агента
+    agent_provider: Optional[str] = None,  # LiteLLM provider (e.g. openrouter)
+    evaluator_llm: Optional[str] = None,  # NL-judge model override
+    evaluator_base_url: Optional[str] = None,  # NL-judge endpoint
+    evaluator_api_key_env: Optional[str] = None,  # NL-judge API key env var
+    max_run_retries: Optional[int] = None,  # Re-run an errored simulation N times
 ) -> Path:
     """
     Запустить все эксперименты.
@@ -182,8 +187,14 @@ def run_all_experiments(
                     # --save-to path relative to simulations/ (includes run subdir)
                     save_to_name = f"{run_dir_name}/{file_name}" if run_dir_name else file_name
 
-                    # Формируем команду
-                    use_local_models = not agent_base_url and not api_key_env
+                    # Формируем команду. Only treat the run as "local" (strip
+                    # api_key/api_base/provider) when NO remote routing is configured —
+                    # a provider (e.g. openrouter) or an api-key-env both imply remote.
+                    use_local_models = (
+                        not agent_base_url
+                        and not api_key_env
+                        and not agent_provider
+                    )
                     if solo:
                         cmd = [
                             "duma",
@@ -238,6 +249,18 @@ def run_all_experiments(
                             cmd += ["--user-base-url", agent_base_url]
                     if api_key_env:
                         cmd += ["--api-key-env", api_key_env]
+                    if agent_provider:
+                        cmd += ["--agent-provider", agent_provider]
+                        if not solo:
+                            cmd += ["--user-provider", agent_provider]
+                    if evaluator_llm:
+                        cmd += ["--evaluator-llm", evaluator_llm]
+                    if evaluator_base_url:
+                        cmd += ["--evaluator-base-url", evaluator_base_url]
+                    if evaluator_api_key_env:
+                        cmd += ["--evaluator-api-key-env", evaluator_api_key_env]
+                    if max_run_retries is not None:
+                        cmd += ["--max-run-retries", str(max_run_retries)]
                     if use_local_models:
                         cmd += ["--local-models"]
                     # Проверка: убедимся, что все аргументы - строки
@@ -566,6 +589,36 @@ def main():
         default=None,
         help="Environment variable name for API key (e.g. VSE_LLM_API_KEY)",
     )
+    parser.add_argument(
+        "--agent-provider",
+        type=str,
+        default=None,
+        help="LiteLLM provider for agent+user routing (e.g. openrouter).",
+    )
+    parser.add_argument(
+        "--evaluator-llm",
+        type=str,
+        default=None,
+        help="Override the NL-assertions judge model.",
+    )
+    parser.add_argument(
+        "--evaluator-base-url",
+        type=str,
+        default=None,
+        help="Base URL for the NL-assertions judge (point at the same stable provider).",
+    )
+    parser.add_argument(
+        "--evaluator-api-key-env",
+        type=str,
+        default=None,
+        help="Env var name for the NL-assertions judge API key.",
+    )
+    parser.add_argument(
+        "--max-run-retries",
+        type=int,
+        default=None,
+        help="Re-run a whole simulation that ends as an infra crash this many times.",
+    )
 
     args = parser.parse_args()
 
@@ -622,6 +675,11 @@ def main():
         api_key_env=args.api_key_env,
         duma_max_concurrency=args.duma_max_concurrency,
         agent_temperature=args.agent_temperature,
+        agent_provider=args.agent_provider,
+        evaluator_llm=args.evaluator_llm,
+        evaluator_base_url=args.evaluator_base_url,
+        evaluator_api_key_env=args.evaluator_api_key_env,
+        max_run_retries=args.max_run_retries,
     )
 
     print("\n" + "=" * 80)
