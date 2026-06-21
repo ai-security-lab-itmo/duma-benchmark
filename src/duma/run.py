@@ -749,6 +749,24 @@ def run_task(
     return simulation
 
 
+# LLM-arg keys whose values are secrets and must never be persisted to result files.
+_SECRET_LLM_ARG_KEYS = ("api_key",)
+
+
+def _redact_llm_args(args: Optional[dict]) -> Optional[dict]:
+    """Return a copy of llm_args with secret values (api_key) redacted.
+
+    Used only for the persisted Info metadata; the live agent/user still receive the
+    real credentials.
+    """
+    if not args:
+        return args
+    return {
+        k: ("***REDACTED***" if (k in _SECRET_LLM_ARG_KEYS and v) else v)
+        for k, v in args.items()
+    }
+
+
 def get_info(
     domain: str,
     agent: str,
@@ -765,13 +783,13 @@ def get_info(
     user_info = UserInfo(
         implementation=user,
         llm=llm_user,
-        llm_args=llm_args_user,
+        llm_args=_redact_llm_args(llm_args_user),
         global_simulation_guidelines=get_global_user_sim_guidelines(),
     )
     agent_info = AgentInfo(
         implementation=agent,
         llm=llm_agent,
-        llm_args=llm_args_agent,
+        llm_args=_redact_llm_args(llm_args_agent),
     )
     environment_info = get_environment_info(
         domain, include_tool_info=False
