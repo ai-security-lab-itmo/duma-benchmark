@@ -71,6 +71,7 @@ def run_all_experiments(
     evaluator_base_url: Optional[str] = None,  # NL-judge endpoint
     evaluator_api_key_env: Optional[str] = None,  # NL-judge API key env var
     max_run_retries: Optional[int] = None,  # Re-run an errored simulation N times
+    reasoning_effort: Optional[str] = None,  # gpt-5/o-series reasoning_effort
 ) -> Path:
     """
     Запустить все эксперименты.
@@ -208,7 +209,16 @@ def run_all_experiments(
                             "--agent-llm",
                             model,
                             "--agent-llm-args",
-                            json.dumps({"temperature": agent_temperature}),
+                            json.dumps(
+                                {
+                                    "temperature": agent_temperature,
+                                    **(
+                                        {"reasoning_effort": reasoning_effort}
+                                        if reasoning_effort
+                                        else {}
+                                    ),
+                                }
+                            ),
                             "--num-trials",
                             str(num_trials),
                             "--task-ids",
@@ -228,7 +238,16 @@ def run_all_experiments(
                             "--agent-llm",
                             model,
                             "--agent-llm-args",
-                            json.dumps({"temperature": agent_temperature}),
+                            json.dumps(
+                                {
+                                    "temperature": agent_temperature,
+                                    **(
+                                        {"reasoning_effort": reasoning_effort}
+                                        if reasoning_effort
+                                        else {}
+                                    ),
+                                }
+                            ),
                             "--user-llm",
                             effective_user_llm,
                             "--user-llm-args",
@@ -619,6 +638,13 @@ def main():
         default=None,
         help="Re-run a whole simulation that ends as an infra crash this many times.",
     )
+    parser.add_argument(
+        "--reasoning-effort",
+        type=str,
+        default=None,
+        choices=["minimal", "low", "medium", "high"],
+        help="reasoning_effort for gpt-5/o-series agents (minimal = closest to off).",
+    )
 
     args = parser.parse_args()
 
@@ -680,6 +706,7 @@ def main():
         evaluator_base_url=args.evaluator_base_url,
         evaluator_api_key_env=args.evaluator_api_key_env,
         max_run_retries=args.max_run_retries,
+        reasoning_effort=args.reasoning_effort,
     )
 
     print("\n" + "=" * 80)
