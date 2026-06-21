@@ -16,6 +16,7 @@ from duma.config import (
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_MAX_ERRORS,
+    DEFAULT_MAX_RUN_RETRIES,
     DEFAULT_MAX_STEPS,
     DEFAULT_NUM_TRIALS,
     DEFAULT_SAVE_TO,
@@ -138,6 +139,14 @@ class RunConfig(BaseModel):
         Field(
             description="The maximum number of concurrent simulations to run",
             default=DEFAULT_MAX_CONCURRENCY,
+        ),
+    ]
+    max_run_retries: Annotated[
+        int,
+        Field(
+            description="Times to re-run a whole simulation that ends as an "
+            "infrastructure crash before giving up",
+            default=DEFAULT_MAX_RUN_RETRIES,
         ),
     ]
     seed: Annotated[

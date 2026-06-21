@@ -1,20 +1,27 @@
 import json
 import multiprocessing
 import random
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from loguru import logger
 
 from duma.agent.llm_agent import LLMAgent, LLMGTAgent, LLMSoloAgent
-from duma.config import DEFAULT_MAX_STEPS_DUAL
+from duma.config import (
+    DEFAULT_MAX_RUN_RETRIES,
+    DEFAULT_MAX_STEPS_DUAL,
+    RETRY_BASE_DELAY_SECONDS,
+    RETRY_MAX_DELAY_SECONDS,
+)
 from duma.data_model.simulation import (
     AgentInfo,
     Info,
     MultiDomainResults,
     Results,
     RunConfig,
+    RunStatus,
     SimulationRun,
     UserInfo,
 )
@@ -29,6 +36,49 @@ from duma.user.user_simulator import DummyUser, get_global_user_sim_guidelines
 from duma.utils.display import ConsoleDisplay, Text
 from duma.utils.pydantic_utils import get_pydantic_hash
 from duma.utils.utils import DATA_DIR, get_commit_hash, get_now, show_dict_diff
+
+
+def _run_with_retries(
+    run_once: Callable[[], SimulationRun],
+    max_retries: int = DEFAULT_MAX_RUN_RETRIES,
+    label: str = "simulation",
+) -> SimulationRun:
+    """Run a single simulation, retrying when it ends as an infrastructure crash.
+
+    Per-call retries (in ``llm_utils.generate``) already absorb individual transient
+    API blips. This is the outer net: if a whole run still ends ``ERRORED`` (e.g. the
+    account was rate-limit saturated for the entire run), re-run it a few times with
+    backoff so a transient infra failure recovers a data point instead of being
+    excluded. A run that raises is also retried; the last exception re-raises only
+    after all attempts are exhausted.
+    """
+    max_retries = max(0, max_retries)
+    simulation: Optional[SimulationRun] = None
+    last_exc: Optional[Exception] = None
+    for attempt in range(max_retries + 1):
+        if attempt > 0:
+            delay = min(
+                RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)),
+                RETRY_MAX_DELAY_SECONDS,
+            )
+            logger.warning(
+                f"Re-running {label} after infrastructure crash "
+                f"(attempt {attempt + 1}/{max_retries + 1}); waiting {delay:.1f}s."
+            )
+            time.sleep(delay)
+        try:
+            simulation = run_once()
+        except Exception as e:  # noqa: BLE001 — re-raised below if all attempts fail
+            last_exc = e
+            logger.error(f"Error running {label} (attempt {attempt + 1}): {e}")
+            continue
+        if simulation.run_status != RunStatus.ERRORED:
+            return simulation
+    if simulation is not None:
+        # Exhausted retries but have a (still ERRORED) simulation — keep it; it will be
+        # excluded from metrics rather than aborting the whole sweep.
+        return simulation
+    raise last_exc  # every attempt raised
 
 
 def get_options() -> RegistryInfo:
@@ -153,6 +203,7 @@ def run_domain(config: RunConfig, skip_save: bool = False) -> Results:
         console_display=True,
         evaluation_type=EvaluationType.ALL_WITH_NL_ASSERTIONS,
         max_concurrency=config.max_concurrency,
+        max_run_retries=config.max_run_retries,
         seed=config.seed,
         log_level=config.log_level,
     )
@@ -238,6 +289,7 @@ def run_domains(domains: list[str], config: RunConfig) -> MultiDomainResults:
             max_errors=config.max_errors,
             save_to=None,  # Don't save individual domain results
             max_concurrency=config.max_concurrency,
+            max_run_retries=config.max_run_retries,
             seed=config.seed,
             log_level=config.log_level,
         )
@@ -310,6 +362,7 @@ def run_tasks(
     console_display: bool = True,
     evaluation_type: EvaluationType = EvaluationType.ALL_WITH_NL_ASSERTIONS,
     max_concurrency: int = 1,
+    max_run_retries: int = DEFAULT_MAX_RUN_RETRIES,
     seed: Optional[int] = 300,
     log_level: Optional[str] = "INFO",
 ) -> Results:
@@ -472,19 +525,23 @@ def run_tasks(
         )
         ConsoleDisplay.console.print(console_text)
         try:
-            simulation = run_task(
-                domain=domain,
-                task=task,
-                agent=agent,
-                user=user,
-                llm_agent=llm_agent,
-                llm_args_agent=llm_args_agent,
-                llm_user=llm_user,
-                llm_args_user=llm_args_user,
-                max_steps=max_steps,
-                max_errors=max_errors,
-                evaluation_type=evaluation_type,
-                seed=seed,
+            simulation = _run_with_retries(
+                lambda: run_task(
+                    domain=domain,
+                    task=task,
+                    agent=agent,
+                    user=user,
+                    llm_agent=llm_agent,
+                    llm_args_agent=llm_args_agent,
+                    llm_user=llm_user,
+                    llm_args_user=llm_args_user,
+                    max_steps=max_steps,
+                    max_errors=max_errors,
+                    evaluation_type=evaluation_type,
+                    seed=seed,
+                ),
+                max_retries=max_run_retries,
+                label=f"task {task.id}, trial {trial}",
             )
             simulation.trial = trial
             if console_display:

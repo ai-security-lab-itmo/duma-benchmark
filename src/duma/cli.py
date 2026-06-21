@@ -11,6 +11,7 @@ from duma.config import (
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_MAX_ERRORS,
+    DEFAULT_MAX_RUN_RETRIES,
     DEFAULT_MAX_STEPS,
     DEFAULT_NUM_TRIALS,
     DEFAULT_SEED,
@@ -178,6 +179,15 @@ def add_run_args(parser):
         type=int,
         default=DEFAULT_MAX_CONCURRENCY,
         help=f"The maximum number of concurrent simulations to run. Default is {DEFAULT_MAX_CONCURRENCY}.",
+    )
+    parser.add_argument(
+        "--max-run-retries",
+        type=int,
+        default=DEFAULT_MAX_RUN_RETRIES,
+        help=(
+            "Times to re-run a whole simulation that ends as an infrastructure crash "
+            f"(after per-call retries) before giving up. Default is {DEFAULT_MAX_RUN_RETRIES}."
+        ),
     )
     parser.add_argument(
         "--seed",
@@ -362,6 +372,7 @@ def run_command(args):
         max_errors=args.max_errors,
         save_to=args.save_to,
         max_concurrency=args.max_concurrency,
+        max_run_retries=args.max_run_retries,
         seed=args.seed,
         log_level=args.log_level,
     )

@@ -30,6 +30,7 @@ def _args(**overrides):
         "max_errors": 5,
         "save_to": None,
         "max_concurrency": 1,
+        "max_run_retries": 2,
         "seed": 123,
         "log_level": "INFO",
     }

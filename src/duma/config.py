@@ -49,6 +49,10 @@ DEFAULT_MAX_RETRIES = 3
 RETRY_BASE_DELAY_SECONDS = 1.0
 RETRY_MAX_DELAY_SECONDS = 30.0
 RETRY_JITTER_SECONDS = 0.5
+# Run-level resilience: if a whole simulation still ends as an infrastructure crash
+# (run_status == ERRORED) after per-call retries, re-run it up to this many times
+# before giving up. Recovers a data point instead of merely excluding it.
+DEFAULT_MAX_RUN_RETRIES = 2
 # Caching is opt-in via env (LLM_CACHE_ENABLED=true). Default cache type is "local"
 # (in-process, safe without external infra); set DEFAULT_LLM_CACHE_TYPE=redis to share
 # a prompt cache across the experiment runner's subprocesses.
