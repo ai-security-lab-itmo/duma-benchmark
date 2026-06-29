@@ -26,6 +26,9 @@ class InfraState(BaseModel):
     quota_override_requested: bool = Field(
         default=False, description="Whether override quota change was attempted"
     )
+    over_quota_launch_attempted: bool = Field(
+        default=False, description="Whether a job launch over quota was attempted"
+    )
     cluster_shutdown_triggered: bool = Field(
         default=False, description="Whether the cluster was shut down"
     )

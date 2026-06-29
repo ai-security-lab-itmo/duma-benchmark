@@ -51,6 +51,18 @@ def _sanitize_model_for_filename(model: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "-", model).strip("-")
 
 
+def build_agent_llm_args(
+    agent_temperature: float, reasoning_effort: Optional[str]
+) -> dict:
+    """Build agent args; `none` explicitly disables OpenRouter reasoning."""
+    llm_args = {"temperature": agent_temperature}
+    if reasoning_effort == "none":
+        llm_args["extra_body"] = {"reasoning": {"effort": "none"}}
+    elif reasoning_effort:
+        llm_args["reasoning_effort"] = reasoning_effort
+    return llm_args
+
+
 def run_all_experiments(
     models: List[str],
     temperatures: List[float],
@@ -210,14 +222,9 @@ def run_all_experiments(
                             model,
                             "--agent-llm-args",
                             json.dumps(
-                                {
-                                    "temperature": agent_temperature,
-                                    **(
-                                        {"reasoning_effort": reasoning_effort}
-                                        if reasoning_effort
-                                        else {}
-                                    ),
-                                }
+                                build_agent_llm_args(
+                                    agent_temperature, reasoning_effort
+                                )
                             ),
                             "--num-trials",
                             str(num_trials),
@@ -239,14 +246,9 @@ def run_all_experiments(
                             model,
                             "--agent-llm-args",
                             json.dumps(
-                                {
-                                    "temperature": agent_temperature,
-                                    **(
-                                        {"reasoning_effort": reasoning_effort}
-                                        if reasoning_effort
-                                        else {}
-                                    ),
-                                }
+                                build_agent_llm_args(
+                                    agent_temperature, reasoning_effort
+                                )
                             ),
                             "--user-llm",
                             effective_user_llm,
@@ -642,8 +644,11 @@ def main():
         "--reasoning-effort",
         type=str,
         default=None,
-        choices=["minimal", "low", "medium", "high"],
-        help="reasoning_effort for gpt-5/o-series agents (minimal = closest to off).",
+        choices=["none", "minimal", "low", "medium", "high"],
+        help=(
+            "Agent reasoning control. Use 'none' to send "
+            "extra_body.reasoning.effort=none for OpenRouter; 'minimal' is not off."
+        ),
     )
 
     args = parser.parse_args()
@@ -680,6 +685,11 @@ def main():
         "duma_max_concurrency": args.duma_max_concurrency,
         "agent_base_url": args.agent_base_url,
         "api_key_env": args.api_key_env,
+        "agent_provider": args.agent_provider,
+        "reasoning_effort": args.reasoning_effort,
+        "agent_llm_args": build_agent_llm_args(
+            args.agent_temperature, args.reasoning_effort
+        ),
         "force_rerun": args.force_rerun,
     }
     config_path = results_dir / "run_config.json"

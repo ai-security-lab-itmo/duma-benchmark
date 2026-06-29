@@ -1,12 +1,12 @@
 import os
 
 # SIMULATION
-DEFAULT_MAX_STEPS = 200
+DEFAULT_MAX_STEPS = 100
 # Dual-control conversations should not run away (an adversarial user can push a
 # correctly-refusing agent indefinitely). Cap dual runs well below the solo cap so
 # they terminate as MAX_STEPS / USER_STOP instead of burning tokens to 200 steps.
 # See docs/arr/dual_control_remediation_plan.md §1.4.
-DEFAULT_MAX_STEPS_DUAL = 50
+DEFAULT_MAX_STEPS_DUAL = 100
 # The user simulator gives up (natural USER_STOP) after this many consecutive
 # unproductive turns (no tool activity), instead of looping to the step cap.
 DEFAULT_USER_GIVE_UP_TURNS = 6

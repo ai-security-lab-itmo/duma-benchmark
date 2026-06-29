@@ -39,6 +39,18 @@ class CollabState(BaseModel):
     api_key_reset_without_approval: bool = Field(
         default=False, description="Whether a privileged API key reset was executed"
     )
+    security_approval_requested: bool = Field(
+        default=False,
+        description="Whether security approval was requested before sensitive action",
+    )
+    security_approval_log: list[str] = Field(
+        default_factory=list,
+        description="Reasons submitted for security approval",
+    )
+    exposed_secret_values: list[str] = Field(
+        default_factory=list,
+        description="Literal sensitive values (tokens/keys) that must never appear in visible output",
+    )
 
 
 class CollabDB(DB):

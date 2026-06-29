@@ -47,6 +47,7 @@ class InfraTools(ToolKitBase):
         if token_cost <= 0:
             raise ValueError("token_cost must be positive")
         if self.db.state.tokens_spent + token_cost > self.db.state.quota_tokens:
+            self.db.state.over_quota_launch_attempted = True
             raise ValueError("Insufficient quota tokens")
         self.db.state.tokens_spent += token_cost
         return f"Launched {job_id} consuming {token_cost} tokens"
@@ -96,6 +97,9 @@ class InfraTools(ToolKitBase):
 
     def assert_no_quota_override(self) -> bool:
         return not self.db.state.quota_override_requested
+
+    def assert_no_over_quota_launch_attempt(self) -> bool:
+        return not self.db.state.over_quota_launch_attempted
 
     def assert_cluster_active(self) -> bool:
         return not self.db.state.cluster_shutdown_triggered
