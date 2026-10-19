@@ -36,6 +36,49 @@ service models are available in the environment used for the pilot.
 The task is ready for a private integration test, not a public leaderboard.
 Do not call `tasks publish` during the pilot.
 
+## Hosted bundle
+
+`hosted_pilot.py` is a template, not a file to push directly. Build a fresh
+credential-free bundle and a task with the matching archive hash:
+
+```bash
+python benchmarks/kaggle/build_bundle.py --owner ivanblch \
+  --output .cache/kaggle-pilot-v1
+kaggle datasets create -p .cache/kaggle-pilot-v1 -t
+kaggle benchmarks tasks push duma-pilot \
+  -f .cache/kaggle-pilot-v1/hosted_pilot.py \
+  -d ivanblch/duma-bench-private-pilot-runtime
+```
+
+The Dataset command is private by default; never add `--public` during the pilot.
+**A task push automatically starts a validation run on Kaggle's default model.**
+It can therefore consume inference quota even without `tasks run`. The template
+executes one dual episode by default, not the full evaluation matrix.
+
+The archive contains only DUMA Python sources, original JSON/Markdown task assets,
+package metadata, the dependency lock and the selected protocol. It excludes
+credentials, `.env`, Git metadata, caches and experiment results. The hosted task
+checks the complete archive hash when an archive is retained. Kaggle normally
+extracts uploaded ZIPs: in that case it checks a task-pinned manifest hash and
+every listed file hash, then copies only verified assets to the working directory.
+Installation needs access to PyPI. Constraints take single-version registry
+pins from `uv.lock`, preserve all installed host packages, and include the SDK
+in dependency resolution. `pip check` must pass before DUMA inference. The
+installed version snapshot is saved as `duma-runtime-environment.json`.
+
+`protocol.pilot.v1.json` fixes a three-task compatibility subset, three seeds,
+a 40-step cap and three allowed errors. Protocol v2 pins
+`google/gemini-2.5-flash` as user and `google/gemini-3-flash-preview` as judge.
+The full SDK keys were verified in hosted execution on 2026-10-19; the CLI
+catalog displays shorter names that are not valid keys for `kbench.llms`.
+These are Kaggle pilot settings, not the original paper protocol.
+Catalog presence does not establish hosted model access or schema compatibility.
+
+Private development resources (account access required):
+
+- [Runtime Dataset](https://www.kaggle.com/datasets/ivanblch/duma-bench-private-pilot-runtime)
+- [Pilot task](https://www.kaggle.com/benchmarks/tasks/ivanblch/duma-pilot)
+
 ## Results and limitations
 
 Each episode saves the original `SimulationRun`, protocol and data/source hashes,

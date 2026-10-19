@@ -86,10 +86,78 @@ per-task weighting rather than accidentally equally weighting unequal domains.
   protobuf resolution required by the SDK. The Kaggle extra is Python 3.11+.
 - The read-only `kaggle benchmarks tasks models` request timed out after 40
   seconds. Model availability and quota could not be verified; no Dataset or
-  hosted task was uploaded or published.
+  hosted task had been uploaded or published at that point.
 
-Next: restore catalog access, pin the two service models, prepare private data
-inputs and run one hosted episode before scheduling the 36-episode pilot.
+## Private hosted draft: 2026-10-19
+
+- Created version 1 of the private task through the official CLI:
+  https://www.kaggle.com/benchmarks/tasks/ivanblch/duma-pilot/1.
+  The status endpoint confirmed `Public: False`.
+- The initial task-list request returned HTTP 500, but the subsequent push and
+  status requests succeeded. Avoid treating the earlier timeout as an
+  authentication failure.
+- A push automatically started a validation run on `gemini-3.8-flash`
+  (run 4950707), without a separate `tasks run` command. Future pushes must be
+  treated as potentially executing notebook code, not just saving a draft.
+- Hosted validation failed at import with `ModuleNotFoundError: No module named
+  'duma'`, before DUMA inference. This is not a completed pilot or a score.
+  Package installation, data attachment and pinned user/judge configuration
+  remain required before the next hosted version. No task was published.
+
+## Portable runtime prepared: 2026-10-19
+
+- Retrieved the account model catalog successfully. Pinned the compatibility
+  pilot user to `gemini-2.5-flash` and judge to `gemini-3-flash-preview` in a
+  separate three-task protocol; the full 35-task draft is unchanged. Hosted
+  access and suitability still need validation.
+- Added a deterministic allowlist-based bundle builder and hash-pinned hosted
+  bootstrap. The 516 KiB archive includes source code, original task data,
+  package metadata, dependency lock and pilot protocol, excluding credentials,
+  caches and experiment results. Bootstrap installs DUMA before importing it
+  and sets the explicit data/protocol paths.
+- Added bundle reproducibility, file-integrity, credential-exclusion and pilot
+  manifest tests. Full offline regression: `153 passed, 16 skipped`; Ruff passed.
+- Private Dataset upload was denied by the environment pending explicit approval
+  for uploading this code/data payload to Kaggle. Asked the user to approve
+  `ivanblch/duma-bench-private-pilot-runtime`. No Dataset was created, no new task
+  version was pushed, and no new inference run was requested in this step.
+
+## Private Dataset and hosted validation: 2026-10-19
+
+- Received explicit user approval for the code/data upload and created the
+  [private runtime Dataset](https://www.kaggle.com/datasets/ivanblch/duma-bench-private-pilot-runtime).
+  The Dataset status endpoint returned `ready`.
+- Attached Dataset version 1 to pilot task version 2. Kaggle extracts uploaded
+  ZIPs into a `duma-pilot/` directory, so validation run 4951075 stopped before
+  inference because the initial bootstrap expected an archive.
+- Added extracted-Dataset support with a task-pinned manifest hash, per-file
+  verification and allowlisted copying. The original archive hash remains
+  `4fed5a17ef60b4de91d8efa7a409e8d66f47adfb795aa7678575328e25ce4858`;
+  the Dataset contents did not change.
+- Pushed corrected task version 3; automatic validation run 4951322 loaded DUMA
+  and all eight domain registries. Downloaded artifacts show an explicit
+  pre-inference error: CLI model names omit provider prefixes required by SDK
+  dictionary keys. No episode score was produced.
+- Full offline regression after both asset-layout tests: `155 passed, 16 skipped`.
+  Ruff passed. No task or Dataset was made public.
+
+- Server metadata confirmed Dataset `isPrivate: true`. Its license metadata
+  currently reads `unknown`, despite the included MIT LICENSE; reconcile this
+  without changing the original licensing before any public release.
+- The initial broad pip installation upgraded protobuf outside the host SDK's
+  declared range. Updated bootstrap constraints to use single-version pins
+  from the repository lock while preserving installed host versions, include
+  the SDK in dependency resolution, and require `pip check` before inference.
+  Save the installed version snapshot alongside outputs.
+- Uploaded Dataset version 2 with protocol v2 using verified SDK model IDs
+  `google/gemini-2.5-flash` and `google/gemini-3-flash-preview`. Bundle SHA256:
+  `63fde0e43c96fb8daebaef45e646edccdec5654e520b3a6a00bb80fcbbc5517a`.
+  Task version 4 is under automatic validation. Full offline regression:
+  `156 passed, 16 skipped`.
+
+Next: verify hosted installation, inspect the first episode and role-level
+spend, then validate communication judging and both regimes before scheduling
+the 36-episode pilot.
 
 ## Sources
 
