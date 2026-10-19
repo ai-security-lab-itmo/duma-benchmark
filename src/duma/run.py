@@ -527,6 +527,8 @@ def run_task(
     max_errors: int = 10,
     evaluation_type: EvaluationType = EvaluationType.ALL_WITH_NL_ASSERTIONS,
     seed: Optional[int] = None,
+    judge_model: Optional[str] = None,
+    judge_args: Optional[dict] = None,
 ) -> SimulationRun:
     """
     Runs tasks for a given domain.
@@ -629,6 +631,8 @@ def run_task(
         simulation=simulation,
         evaluation_type=evaluation_type,
         solo_mode=solo_mode,
+        **({"judge_model": judge_model} if judge_model is not None else {}),
+        **({"judge_args": judge_args} if judge_args is not None else {}),
     )
 
     simulation.reward_info = reward_info

@@ -30,6 +30,7 @@ from duma.data_model.message import (
     UserMessage,
 )
 from duma.environment.tool import Tool
+from duma.utils.generation import get_generation_backend
 from duma.utils.model_ref import infer_provider, normalize_model_ref, to_litellm_model
 
 # litellm._turn_on_debug()
@@ -391,6 +392,12 @@ def generate(
 
     Returns: A tuple containing the message and the cost.
     """
+    backend = get_generation_backend(model)
+    if backend is not None:
+        return backend(messages=messages, tools=tools, tool_choice=tool_choice, **kwargs)
+    if model.startswith("duma-kaggle-"):
+        raise ValueError(f"No Kaggle generation backend is bound for {model}")
+
     if kwargs.get("num_retries") is None:
         kwargs["num_retries"] = DEFAULT_MAX_RETRIES
 
