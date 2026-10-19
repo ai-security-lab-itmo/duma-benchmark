@@ -10,7 +10,6 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tomllib
 import zipfile
 
 
@@ -65,30 +64,32 @@ def copy_verified_assets(input_root, runtime, expected_sha, expected_manifest_sh
     (runtime / "bundle-files.json").write_bytes(manifest_bytes)
 
 
-def runtime_constraints(lock_path):
-    versions = {}
-    for package in tomllib.loads(lock_path.read_text())["package"]:
-        if "registry" in package.get("source", {}):
-            versions.setdefault(package["name"], set()).add(package["version"])
-    pins = {
-        name: next(iter(values))
-        for name, values in versions.items()
-        if len(values) == 1
-    }
-    # Already installed host packages can be imported by the notebook kernel.
-    # Keep them intact, including transitive SDK requirements such as protobuf.
-    for distribution in importlib.metadata.distributions():
-        name = distribution.metadata.get("Name")
-        if name:
-            pins[name.lower().replace("_", "-").replace(".", "-")] = (
-                distribution.version
-            )
-    return (
-        "\n".join(f"{name}=={version}" for name, version in sorted(pins.items())) + "\n"
-    )
+def check_host():
+    from packaging.specifiers import SpecifierSet
+
+    sdk = importlib.metadata.version("kaggle-benchmarks")
+    version = tuple(int(part) for part in sdk.split(".")[:3])
+    if version[:2] != (0, 6) or version < (0, 6, 1):
+        raise RuntimeError(f"Unsupported Kaggle SDK version: {sdk}; expected 0.6.x")
+    try:
+        importlib.metadata.version("duma")
+    except importlib.metadata.PackageNotFoundError:
+        pass
+    else:
+        raise RuntimeError("Use a clean environment, not the full DUMA distribution")
+    if "duma" in sys.modules:
+        raise RuntimeError("Restart the notebook kernel before loading a runtime bundle")
+    for name, spec in {
+        "pydantic": ">=2.11,<3",
+        "typing-extensions": ">=4.12,<5",
+    }.items():
+        if importlib.metadata.version(name) not in SpecifierSet(spec):
+            raise RuntimeError(f"Host {name} is incompatible; expected {spec}")
+    return sdk
 
 
 def prepare_runtime():
+    check_host()
     expected_sha = "__DUMA_BUNDLE_SHA256__"
     expected_manifest_sha = "__DUMA_MANIFEST_SHA256__"
     runtime = Path("/kaggle/working/duma-runtime") / expected_manifest_sha
@@ -96,11 +97,20 @@ def prepare_runtime():
         Path("/kaggle/input"), runtime, expected_sha, expected_manifest_sha
     )
 
-    constraints = runtime / "host-constraints.txt"
-    constraints.write_text(runtime_constraints(runtime / "uv.lock"))
-    sdk_requirement = (
-        f"kaggle-benchmarks=={importlib.metadata.version('kaggle-benchmarks')}"
-    )
+    wheels = list(runtime.glob("duma_kaggle_runtime-*.whl"))
+    if len(wheels) != 1:
+        raise ValueError("Expected exactly one minimal runtime wheel")
+    from packaging.specifiers import SpecifierSet
+
+    install = [str(wheels[0])]
+    for name, spec in {"docstring-parser": ">=0.16,<1", "loguru": ">=0.7.3,<1"}.items():
+        try:
+            version = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            install.append(f"{name}{spec}")
+        else:
+            if version not in SpecifierSet(spec):
+                raise RuntimeError(f"Host {name} is incompatible; expected {spec}")
     subprocess.run(
         [
             sys.executable,
@@ -111,10 +121,9 @@ def prepare_runtime():
             "--progress-bar",
             "off",
             "--quiet",
-            "--constraint",
-            str(constraints),
-            str(runtime),
-            sdk_requirement,
+            "--no-deps",
+            "--force-reinstall",
+            *install,
         ],
         check=True,
         timeout=600,
@@ -132,7 +141,6 @@ def prepare_runtime():
     os.environ["DUMA_DATA_DIR"] = str(runtime / "data")
     os.environ["DUMA_KAGGLE_PROTOCOL"] = str(runtime / "protocol.json")
     os.environ["DUMA_KAGGLE_OUTPUT"] = "/kaggle/working/duma-kaggle-results"
-    os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
     print(
         json.dumps(
             {
@@ -150,23 +158,42 @@ prepare_runtime()
 import kaggle_benchmarks as kbench  # noqa: E402
 
 from duma.integrations.kaggle.protocol import load_protocol  # noqa: E402
-from duma.integrations.kaggle.runner import run_episode  # noqa: E402
+from duma.integrations.kaggle.runner import run_episode, run_matrix  # noqa: E402
 
 kbench.config.interactive_mode = False
 print("Available models:", sorted(kbench.llms.keys()))
 
 
-@kbench.task(name="duma-pilot")
+EVALUATION_MODE = "__DUMA_EVALUATION_MODE__"
+
+
+@kbench.task(name="__DUMA_TASK_NAME__")
 def duma_pilot(
     llm,
     domain: str = "collab",
     task_id: str = "collab_poisoning_logs",
     regime: str = "dual",
     trial: int = 0,
-) -> bool:
+) -> float:
+    protocol = load_protocol(os.environ["DUMA_KAGGLE_PROTOCOL"])
+    output = Path(os.environ["DUMA_KAGGLE_OUTPUT"])
+    if EVALUATION_MODE == "check":
+        from duma.utils.utils import DATA_DIR
+
+        protocol.validate_data(DATA_DIR)
+        print(
+            "Runtime readiness only, not a security score:",
+            sum(len(ids) for ids in protocol.tasks.values()),
+            "tasks",
+        )
+        return 1.0
+    if EVALUATION_MODE != "smoke":
+        return run_matrix(llm, protocol, regime=EVALUATION_MODE, output_dir=output)[
+            "score"
+        ]
     return run_episode(
         llm,
-        load_protocol(os.environ["DUMA_KAGGLE_PROTOCOL"]),
+        protocol,
         domain=domain,
         task_id=task_id,
         regime=regime,

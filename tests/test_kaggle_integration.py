@@ -21,7 +21,7 @@ from duma.environment.tool import as_tool
 from duma.integrations.kaggle.backend import KaggleBackend
 from duma.integrations.kaggle.protocol import KaggleProtocol, load_protocol
 from duma.integrations.kaggle.runner import run_episode
-from duma.run import get_tasks
+from duma.runtime import get_tasks
 
 ROOT = Path(__file__).parents[1]
 
@@ -198,6 +198,7 @@ def test_real_duma_episode_executes_tools_and_replays_state_checks(
             trial=0,
             output_dir=tmp_path,
             service_models=fixed,
+            resume=False,
         )
 
 
@@ -331,3 +332,106 @@ def test_pilot_entry_point_runs_as_a_real_sdk_task(protocol, tmp_path, monkeypat
     result = module.duma_pilot.run(target)
     assert result.result is True
     assert len(list((tmp_path / "episodes").glob("*.json"))) == 1
+
+
+def test_resume_uses_verified_completed_episode_without_model_calls(protocol, tmp_path):
+    target = ScriptedLLM("target", [LLMResponse(content="I will keep logs internal.")])
+    fixed = services()
+    kwargs = dict(
+        domain="collab",
+        task_id="collab_poisoning_logs",
+        regime="dual",
+        trial=0,
+        output_dir=tmp_path,
+        service_models=fixed,
+    )
+    assert run_episode(target, protocol, **kwargs)
+    requests = len(target.requests)
+    assert run_episode(target, protocol, **kwargs)
+    assert len(target.requests) == requests
+    path = next(tmp_path.glob("*.json"))
+    body = json.loads(path.read_text())
+    body["score"] = 0
+    path.write_text(json.dumps(body))
+    with pytest.raises(ValueError, match="integrity"):
+        run_episode(target, protocol, **kwargs)
+    assert len(target.requests) == requests
+    assert not list(tmp_path.glob("*.lock"))
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_incomplete_episode_has_no_score_and_can_be_retried(protocol, tmp_path):
+    short = protocol.model_copy(update={"max_steps": 1})
+    kwargs = dict(
+        domain="collab",
+        task_id="collab_poisoning_logs",
+        regime="dual",
+        trial=0,
+        output_dir=tmp_path,
+        service_models=services(),
+    )
+    with pytest.raises(RuntimeError, match="did not finish"):
+        run_episode(ScriptedLLM("target", []), short, **kwargs)
+    artifact = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert artifact["status"] == "incomplete"
+    assert artifact["score"] is None
+    kwargs["service_models"] = services()
+    with pytest.raises(RuntimeError):
+        run_episode(ScriptedLLM("target", []), short, **kwargs)
+    assert len(list((tmp_path / "attempts").glob("*.json"))) == 1
+
+
+def test_matrix_aggregates_and_resumes_without_new_calls(protocol, tmp_path):
+    from duma.integrations.kaggle.runner import run_matrix
+
+    manifest = protocol.model_copy(
+        update={
+            "tasks": {"collab": ["collab_poisoning_logs"]},
+            "trial_seeds": [300, 301],
+        }
+    )
+    target = ScriptedLLM("target", [LLMResponse(content="No logs shared.")] * 2)
+    fixed = services()
+    fixed["fixed-user"] = ScriptedLLM(
+        "fixed-user",
+        [
+            LLMResponse(content=text)
+            for text in [
+                "Please resolve safely.",
+                "###STOP###",
+                "Please resolve safely.",
+                "###STOP###",
+            ]
+        ],
+    )
+    summary = run_matrix(
+        target, manifest, regime="dual", output_dir=tmp_path, service_models=fixed
+    )
+    assert summary["score"] == 1
+    assert summary["completed"] == 2
+    assert len(target.requests) == 2
+    assert (
+        run_matrix(
+            target, manifest, regime="dual", output_dir=tmp_path, service_models=fixed
+        )["score"]
+        == 1
+    )
+    assert len(target.requests) == 2
+
+
+def test_matrix_refuses_to_return_score_after_provider_error(protocol, tmp_path):
+    from duma.integrations.kaggle.runner import run_matrix
+
+    manifest = protocol.model_copy(
+        update={"tasks": {"collab": ["collab_poisoning_logs"]}, "trial_seeds": [300]}
+    )
+    with pytest.raises(RuntimeError, match="no leaderboard score"):
+        run_matrix(
+            ScriptedLLM("target", [RuntimeError("Recorded denial")]),
+            manifest,
+            regime="dual",
+            output_dir=tmp_path,
+            service_models=services(),
+        )
+    report = json.loads(next((tmp_path / "summaries").glob("*.json")).read_text())
+    assert report["score"] is None and not report["complete"]

@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from duma.data_model.message import AssistantMessage
 from duma.integrations.kaggle.protocol import fingerprint_files, load_protocol
 from duma.utils.generation import use_generation_backends
-from duma.utils.llm_utils import generate
+from duma.utils.generation import generate
 
 ROOT = Path(__file__).parents[1]
 
@@ -47,9 +47,6 @@ def test_data_validation_and_content_fingerprints(tmp_path):
 
 
 def test_generation_bindings_are_scoped_and_unbound_aliases_fail(monkeypatch):
-    monkeypatch.setattr(
-        "duma.utils.llm_utils.completion", lambda **_: pytest.fail("API call")
-    )
     response = AssistantMessage(role="assistant", content="offline")
     with pytest.raises(ValueError, match="No Kaggle"):
         generate("duma-kaggle-target", [])

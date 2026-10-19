@@ -8,7 +8,7 @@ from duma.config import DEFAULT_LLM_NL_ASSERTIONS, DEFAULT_LLM_NL_ASSERTIONS_ARG
 from duma.data_model.message import Message, SystemMessage, UserMessage
 from duma.data_model.simulation import NLAssertionCheck, RewardInfo
 from duma.data_model.tasks import RewardType, Task
-from duma.utils.llm_utils import generate
+from duma.utils.generation import generate
 
 
 class _JudgeDecision(BaseModel):
