@@ -1,10 +1,20 @@
 import json
+from collections import Counter
+from typing import Optional
+
+from pydantic import BaseModel, StrictBool, TypeAdapter
 
 from duma.config import DEFAULT_LLM_NL_ASSERTIONS, DEFAULT_LLM_NL_ASSERTIONS_ARGS
 from duma.data_model.message import Message, SystemMessage, UserMessage
 from duma.data_model.simulation import NLAssertionCheck, RewardInfo
 from duma.data_model.tasks import RewardType, Task
-from duma.utils.llm_utils import generate
+from duma.utils.generation import generate
+
+
+class _JudgeDecision(BaseModel):
+    expectedOutcome: str
+    reasoning: str
+    metExpectation: StrictBool
 
 
 class NLAssertionsEvaluator:
@@ -18,6 +28,8 @@ class NLAssertionsEvaluator:
         task: Task,
         full_trajectory: list[Message],
         solo_mode: bool = False,
+        judge_model: Optional[str] = None,
+        judge_args: Optional[dict] = None,
     ) -> RewardInfo:
         """
         Calculate the reward for the simulation by using an LLM to evaluate whether the trajectory adheres to all the natural-language assertions
@@ -39,7 +51,11 @@ class NLAssertionsEvaluator:
             )
 
         nl_assertions_checks = cls.evaluate_nl_assertions(
-            full_trajectory, nl_assertions, solo_mode=solo_mode
+            full_trajectory,
+            nl_assertions,
+            solo_mode=solo_mode,
+            judge_model=judge_model,
+            judge_args=judge_args,
         )
 
         # Calculate reward: 1 if all expectations are met, 0 otherwise
@@ -58,6 +74,8 @@ class NLAssertionsEvaluator:
         trajectory: list[Message],
         nl_assertions: list[str],
         solo_mode: bool = False,
+        judge_model: Optional[str] = None,
+        judge_args: Optional[dict] = None,
     ) -> list[NLAssertionCheck]:
         """
         Evaluate whether the trajectory meets each expected outcome.
@@ -136,16 +154,25 @@ class NLAssertionsEvaluator:
         ]
 
         assistant_message = generate(
-            model=DEFAULT_LLM_NL_ASSERTIONS,
+            model=judge_model or DEFAULT_LLM_NL_ASSERTIONS,
             messages=messages,
-            **DEFAULT_LLM_NL_ASSERTIONS_ARGS,
+            **(DEFAULT_LLM_NL_ASSERTIONS_ARGS if judge_args is None else judge_args),
         )
         result_data = json.loads(assistant_message.content)
+        if not isinstance(result_data, dict) or not isinstance(
+            result_data.get("results"), list
+        ):
+            raise ValueError("Judge response must contain a results list")
+        decisions = TypeAdapter(list[_JudgeDecision]).validate_python(
+            result_data["results"]
+        )
+        if Counter(d.expectedOutcome for d in decisions) != Counter(nl_assertions):
+            raise ValueError("Judge must grade every expected assertion exactly once")
         return [
             NLAssertionCheck(
-                nl_assertion=result["expectedOutcome"],
-                met=result["metExpectation"],
-                justification=result["reasoning"],
+                nl_assertion=result.expectedOutcome,
+                met=result.metExpectation,
+                justification=result.reasoning,
             )
-            for result in result_data.get("results", [])
+            for result in decisions
         ]
