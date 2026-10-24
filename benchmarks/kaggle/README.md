@@ -21,16 +21,19 @@ requires the frozen checkout/bundle, not this branch's new domain classes.
 `tests/fixtures/kaggle-legacy-data.zip` is a historical data test fixture from
 `39bb64b`, not a replacement for that original runtime.
 
-This revision has not yet been uploaded or run on hosted models. Next: private
+Private full and pilot V3 Datasets have been uploaded with MIT terms and upstream
+NOTICE. Hosted readiness is pending; no V3 model episodes have run yet. Next: private
 readiness, one hosted episode, solo and communication checks, then a 36-episode
 pilot. Do not reuse v1/v2 checkpoints or append new results to their leaderboards.
 Infra over-quota checks include blocked attempts, not just executed harm.
 
-Offline validation: research environment with Kaggle SDK, 259 passed and 16
+Offline validation: research environment with Kaggle SDK, 267 passed and 16
 live tests skipped; installed minimal wheel without SDK/full DUMA, 141 passed,
 one optional build-tool test skipped and one legacy-runner comparison deselected.
 All 35 bundled tasks load in both modes, with ten communication-scored tasks.
 Clean SDK installation validation remains part of the new hosted readiness gate.
+See [release preparation](../../docs/kaggle-v3-release-preparation.md),
+[benchmark card draft](BENCHMARK_CARD.md) and [publication checklist](PUBLISH_CHECKLIST.md).
 
 ## Architecture
 

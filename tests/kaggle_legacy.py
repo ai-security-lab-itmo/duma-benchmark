@@ -30,4 +30,5 @@ def build_root(directory):
     for name in ("src", "benchmarks"):
         (directory / name).symlink_to(ROOT / name)
     shutil.copyfile(ROOT / "LICENSE", directory / "LICENSE")
+    shutil.copyfile(ROOT / "NOTICE", directory / "NOTICE")
     return directory

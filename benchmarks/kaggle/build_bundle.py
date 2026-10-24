@@ -21,6 +21,7 @@ name = "duma-kaggle-runtime"
 version = "0.1.0"
 requires-python = ">=3.11"
 license = "MIT"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = ["pydantic>=2.11,<3", "docstring-parser>=0.16,<1", "typing-extensions>=4.12,<5", "loguru>=0.7.3,<1"]
 """
 
@@ -57,6 +58,7 @@ def build_wheel(root: Path, destination: Path) -> Path:
         stage = Path(directory)
         (stage / "pyproject.toml").write_text(RUNTIME_PROJECT)
         shutil.copyfile(root / "LICENSE", stage / "LICENSE")
+        shutil.copyfile(root / "NOTICE", stage / "NOTICE")
         for path in sorted(files):
             if path.is_symlink():
                 raise ValueError(f"Source symlinks are not allowed: {path}")
@@ -95,7 +97,7 @@ def build_bundle(
     with tempfile.TemporaryDirectory() as wheel_dir:
         wheel = build_wheel(root, Path(wheel_dir))
         contents = {wheel.name: wheel.read_bytes()}
-    paths = [root / "LICENSE"]
+    paths = [root / "LICENSE", root / "NOTICE"]
     paths += sorted((root / "data" / "duma").rglob("*.json"))
     paths += sorted((root / "data" / "duma").rglob("*.md"))
     for path in paths:
@@ -121,7 +123,16 @@ def build_bundle(
     revision["revise_assets"](contents, protocol_version)
     is_v2 = protocol_version in revision["V2_PROTOCOLS"]
     is_v3 = protocol_version in revision["V3_PROTOCOLS"]
-    prefix = "duma-v3" if is_v3 else "duma-v2" if is_v2 else "duma"
+    is_v3_pilot = protocol_version == "duma-kaggle-private-pilot-v6"
+    prefix = (
+        "duma-v3-pilot"
+        if is_v3_pilot
+        else "duma-v3"
+        if is_v3
+        else "duma-v2"
+        if is_v2
+        else "duma"
+    )
     file_hashes = {
         name: hashlib.sha256(data).hexdigest() for name, data in contents.items()
     }
@@ -157,7 +168,8 @@ def build_bundle(
         "id": f"{owner}/duma-bench-private-v2-runtime"
         if is_v2
         else f"{owner}/duma-bench-private-pilot-runtime",
-        "licenses": [{"name": "MIT"}],
+        "licenses": [{"name": "other"}],
+        "isPrivate": True,
         "description": "Private DUMA Kaggle v2 code, explicitly revised task assets and pinned protocol. No model credentials or experiment results are included."
         if is_v2
         else "Private DUMA pilot code, original task assets and pinned pilot protocol. No model credentials or experiment results are included.",
@@ -168,6 +180,16 @@ def build_bundle(
             id=f"{owner}/duma-bench-private-v3-runtime",
             description="Private DUMA hardened tasks, minimal runtime and hash-pinned v3 protocol. Not comparable with v1/v2 results. No credentials or experiment results included.",
         )
+        if is_v3_pilot:
+            metadata.update(
+                title="DUMA Bench Private V3 Pilot Runtime",
+                id=f"{owner}/duma-bench-private-v3-pilot-runtime",
+            )
+    metadata["description"] += (
+        "\n\nLicense: MIT. See the included LICENSE file for the full terms. "
+        "Kaggle metadata uses 'Other' because its supported Dataset license list "
+        "does not include MIT; this does not relicense the code or task assets."
+    )
     (output / "dataset-metadata.json").write_text(json.dumps(metadata, indent=2))
     (output / "bundle-sha256.txt").write_text(digest + "\n")
     return digest

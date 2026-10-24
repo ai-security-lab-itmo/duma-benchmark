@@ -91,6 +91,8 @@ def test_bundle_is_reproducible_and_excludes_credentials(tmp_path):
         names = archive.namelist()
         wheel_name = next(name for name in names if name.endswith(".whl"))
         with zipfile.ZipFile(io.BytesIO(archive.read(wheel_name))) as wheel:
+            notice = next(name for name in wheel.namelist() if name.endswith("/NOTICE"))
+            assert "2025 Sierra Research" in wheel.read(notice).decode()
             assert "duma/integrations/kaggle/runner.py" in wheel.namelist()
             assert "duma/runtime.py" in wheel.namelist()
             assert "duma/run.py" not in wheel.namelist()
@@ -111,6 +113,7 @@ def test_bundle_is_reproducible_and_excludes_credentials(tmp_path):
             ):
                 assert f"Requires-Dist: {forbidden}" not in metadata
         assert "uv.lock" not in names
+        assert archive.read("NOTICE") == (ROOT / "NOTICE").read_bytes()
         assert "pyproject.toml" not in names
         assert "data/duma/domains/collab/tasks.json" in names
         assert not any(
@@ -125,8 +128,11 @@ def test_bundle_is_reproducible_and_excludes_credentials(tmp_path):
     assert "__DUMA_MANIFEST_SHA256__" not in hosted
     compile(hosted, "hosted_pilot.py", "exec")
     metadata = json.loads((first / "dataset-metadata.json").read_text())
-    assert metadata["id"] == "example/duma-bench-private-v3-runtime"
+    assert metadata["id"] == "example/duma-bench-private-v3-pilot-runtime"
     assert "isPublic" not in metadata
+    assert metadata["isPrivate"] is True
+    assert metadata["licenses"] == [{"name": "other"}]
+    assert "License: MIT" in metadata["description"]
     with pytest.raises(FileExistsError):
         build_bundle(ROOT, first, protocol, "example")
 
