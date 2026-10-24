@@ -61,16 +61,53 @@ models must be pinned before inference. The diagnostic pilot has three tasks and
 shorter limits, a different protocol. SDK model keys include provider prefixes.
 Do not silently substitute unavailable services or omit communication checks.
 
-The previously selected Google services returned a region-access error for this
-account. Catalog presence is not proof of inference access. Packaging does not
-remove provider access restrictions.
+The current private pilot uses `protocol.pilot.v4.json`: three tasks, two regimes,
+seeds 300--302, 100 steps and 3 errors. Earlier v3 used 40 steps. Target reasoning
+is `none` for both Gemini 3.8 Flash and GPT-5.4 mini; user/judge settings are
+unchanged from `protocol.pilot.v1.json` (protocol version v2). Keep protocols and
+source hashes separate; old results are not overwritten by the new pilot.
+OpenAI function tools with `reasoning=low` were rejected by the hosted Chat
+Completions endpoint; v3 was explicitly approved instead of silently changing
+generation settings. The earlier Google region-access error no longer prevents
+the tested calls. Catalog presence alone is still not proof of inference access.
+
+Task pushes execute the full selected profile on Kaggle's default target as
+validation. An incomplete matrix deliberately raises without a leaderboard score,
+which may leave the task in `ERRORED`. CLI 2.2.4 refuses to schedule other models
+in that state; the official `batch_schedule_benchmark_task_runs` API can schedule
+an independent target run without repeating validation. This does not change
+the incomplete matrix or authorize assigning it a score.
 
 ## Artifacts and scoring
+
+Kaggle-only v2 preparation uses `protocol.full.v2.json` / `protocol.pilot.v5.json`.
+The builder applies a hash-manifested revision to generated assets only; v1 data
+and assertion semantics remain intact. Revised infra policy, field-aware identifier
+checks and explicit marketing campaign IDs are documented in
+[v2 preparation](../../docs/kaggle-v2-preparation.md). Private v2 hosted readiness
+passed (run 5401810, SDK 0.6.2) without model calls. Full-v2 subsequently completed
+all 420 rows: see [verified compliance results and interpretation limits](../../docs/kaggle-full-v2-results.md).
+The readiness task's 1.0 is only an installation indicator. Dataset API metadata
+still reports license `unknown` despite MIT in the uploaded metadata and LICENSE;
+resolve before any public release.
+
+**Full-v1 release hold:** offline replay matched all 420 selected completed
+episodes, but audit found two false secret-output failures and infra policy/scoring
+gaps. Preserve raw results; do not promote them as a validated public safety ranking.
+See [audit and release gates](../../docs/kaggle-full-v1-audit.md) and
+[frozen run identities/results](../../docs/kaggle-full-v1-results.md).
+`audit_full_v1.py` verifies private artifacts without inference and can stage local
+resume inputs. It does not publish, upload or repair scores.
 
 Rows retain target/services, protocol/data/source hashes, SDK version, seed,
 trajectory, assertions, outcome and per-role usage. Completed success and policy
 failure are distinct from technical errors and incomplete episodes. Unknown
 cost stays null, not zero.
+
+The unscored trajectory is captured before evaluation, so a judge parse/schema
+error retains the completed conversation and the last raw judge response in the
+technical-error checkpoint. Judge parsing accepts an exact outer Markdown JSON
+fence, but does not repair JSON or relax schema, boolean or assertion checks.
 
 Checkpoints are checksummed and atomically replaced under exclusive locks.
 Resume reuses verified completed episodes only; retried failures are archived in

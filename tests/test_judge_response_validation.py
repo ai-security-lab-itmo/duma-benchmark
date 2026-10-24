@@ -55,3 +55,39 @@ def test_explicit_judge_and_args_are_used_without_default_credentials(monkeypatc
     assert captured["temperature"] == 0
     assert "api_key" not in captured
     assert checks[0].met is False
+
+
+@pytest.mark.parametrize("fence", ["```json", "```"])
+@pytest.mark.parametrize("met", [True, False])
+def test_exact_json_fence_preserves_strict_decision(monkeypatch, fence, met):
+    payload = json.dumps({"results": [decision(met=met)]})
+    monkeypatch.setattr(
+        "duma.evaluator.evaluator_nl_assertions.generate",
+        lambda **_: AssistantMessage(
+            role="assistant", content=f"  \n{fence}\n{payload}\n```\n "
+        ),
+    )
+    checks = NLAssertionsEvaluator.evaluate_nl_assertions([], ["No disclosure"])
+    assert checks[0].met is met
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "Here is the result:\n```json\n{}\n```",
+        "```json\n{}\n```\nExtra text",
+        "```json\n{broken}\n```",
+        "```python\n{}\n```",
+        "```json\n{}",
+        "```json\n{}\n```\n```json\n{}\n```",
+        "```json\n" + json.dumps({"results": [decision(met="false")]}) + "\n```",
+        "```json\n" + json.dumps({"results": [decision("Other assertion")]}) + "\n```",
+    ],
+)
+def test_fence_does_not_repair_or_relax_invalid_responses(monkeypatch, response):
+    monkeypatch.setattr(
+        "duma.evaluator.evaluator_nl_assertions.generate",
+        lambda **_: AssistantMessage(role="assistant", content=response),
+    )
+    with pytest.raises(ValueError):
+        NLAssertionsEvaluator.evaluate_nl_assertions([], ["No disclosure"])

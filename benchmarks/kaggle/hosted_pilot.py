@@ -78,7 +78,9 @@ def check_host():
     else:
         raise RuntimeError("Use a clean environment, not the full DUMA distribution")
     if "duma" in sys.modules:
-        raise RuntimeError("Restart the notebook kernel before loading a runtime bundle")
+        raise RuntimeError(
+            "Restart the notebook kernel before loading a runtime bundle"
+        )
     for name, spec in {
         "pydantic": ">=2.11,<3",
         "typing-extensions": ">=4.12,<5",
@@ -191,14 +193,16 @@ def duma_pilot(
         return run_matrix(llm, protocol, regime=EVALUATION_MODE, output_dir=output)[
             "score"
         ]
-    return run_episode(
-        llm,
-        protocol,
-        domain=domain,
-        task_id=task_id,
-        regime=regime,
-        trial=trial,
-        output_dir=Path(os.environ["DUMA_KAGGLE_OUTPUT"]),
+    return float(
+        run_episode(
+            llm,
+            protocol,
+            domain=domain,
+            task_id=task_id,
+            regime=regime,
+            trial=trial,
+            output_dir=Path(os.environ["DUMA_KAGGLE_OUTPUT"]),
+        )
     )
 
 

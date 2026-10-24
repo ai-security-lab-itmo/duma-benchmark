@@ -1,5 +1,7 @@
 """Single-episode execution without experiment, display or provider dependencies."""
 
+from collections.abc import Callable
+
 from duma.agent.llm_agent import LLMAgent, LLMGTAgent, LLMSoloAgent
 from duma.evaluator.evaluator import EvaluationType, evaluate_simulation
 from duma.orchestrator.orchestrator import Orchestrator
@@ -36,6 +38,7 @@ def run_task(
     seed: int | None = None,
     judge_model: str | None = None,
     judge_args: dict | None = None,
+    on_simulation_complete: Callable[[SimulationRun], None] | None = None,
 ) -> SimulationRun:
     if max_steps <= 0 or max_errors <= 0:
         raise ValueError("Max steps and max errors must be greater than zero")
@@ -88,6 +91,8 @@ def run_task(
         seed=seed,
         solo_mode=solo,
     ).run()
+    if on_simulation_complete is not None:
+        on_simulation_complete(simulation)
     judge_options = {}
     if judge_model is not None:
         judge_options["judge_model"] = judge_model

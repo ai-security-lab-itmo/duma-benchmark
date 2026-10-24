@@ -14,6 +14,7 @@ from kaggle_benchmarks.serializers.openai import OpenAICompletionSerializer
 from duma.data_model.message import (
     AssistantMessage,
     SystemMessage,
+    ToolCall,
     ToolMessage,
     UserMessage,
 )
@@ -119,6 +120,48 @@ def test_histories_do_not_leak_between_service_roles():
     )
     assert [m.content for m in llm.requests[0][0]] == ["public"]
     assert [m.content for m in llm.requests[1][0]] == ["private persona"]
+
+
+def test_gemini_system_only_start_has_empty_transport_turn():
+    llm = ScriptedLLM("google/gemini-test", [LLMResponse(content="ready")])
+    history = [SystemMessage(role="system", content="Unchanged solo task")]
+    KaggleBackend(llm, "target")(messages=history)
+    wire = list(OpenAICompletionSerializer().dump_messages(llm.requests[0][0]))
+    assert wire == [
+        {"role": "system", "content": "Unchanged solo task"},
+        {"role": "user", "content": "\n"},
+    ]
+    assert len(history) == 1
+    first = AssistantMessage(
+        role="assistant",
+        content=None,
+        tool_calls=[ToolCall(id="call-1", name="get_collab_note", arguments={})],
+    )
+    replay = ScriptedLLM("google/gemini-test", [LLMResponse(content="ready")])
+    KaggleBackend(replay, "target")(
+        messages=history
+        + [first, ToolMessage(role="tool", id="call-1", content="note")]
+    )
+    replay_wire = list(
+        OpenAICompletionSerializer().dump_messages(replay.requests[0][0])
+    )
+    assert replay_wire[:2] == wire
+    assert [message["role"] for message in replay_wire] == [
+        "system",
+        "user",
+        "assistant",
+        "tool",
+    ]
+
+
+def test_gemini_normal_history_has_no_extra_transport_turn():
+    llm = ScriptedLLM("google/gemini-test", [LLMResponse(content="ready")])
+    history = [
+        SystemMessage(role="system", content="Policy"),
+        UserMessage(role="user", content="Request"),
+    ]
+    KaggleBackend(llm, "target")(messages=history)
+    assert [message.content for message in llm.requests[0][0]] == ["Policy", "Request"]
 
 
 def test_native_genai_preserves_tool_carriers_and_translates_limits(monkeypatch):
@@ -306,6 +349,41 @@ def test_communication_assertions_use_the_fixed_judge(protocol, tmp_path):
     assert len(fixed["fixed-judge"].requests) == 1
     artifact = json.loads(next(tmp_path.glob("*.json")).read_text())
     assert len(artifact["usage_by_role"]["judge"]) == 1
+
+
+@pytest.mark.parametrize("response", ["not JSON", '{"results": []}'])
+def test_judge_error_retains_unscored_trajectory_and_raw_response(
+    protocol, tmp_path, response
+):
+    target = ScriptedLLM("target", [LLMResponse(content="Per policy, sanitized only.")])
+    fixed = services()
+    fixed["fixed-judge"] = ScriptedLLM("fixed-judge", [LLMResponse(content=response)])
+    with pytest.raises(ValueError):
+        run_episode(
+            target,
+            protocol,
+            domain="output_handling",
+            task_id="output_xss_block",
+            regime="dual",
+            trial=0,
+            output_dir=tmp_path,
+            service_models=fixed,
+        )
+    artifact = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert artifact["status"] == "technical_error"
+    assert artifact["score"] is None
+    assert artifact["simulation"]["reward_info"] is None
+    assert artifact["simulation"]["termination_reason"] == "user_stop"
+    assert any(
+        message.get("content") == "Per policy, sanitized only."
+        for message in artifact["simulation"]["messages"]
+    )
+    assert artifact["judge_response"]["content"] == response
+    assert artifact["judge_response"]["raw_data"]["model"] == "fixed-judge"
+    assert len(artifact["usage_by_role"]["judge"]) == 1
+    from duma.integrations.kaggle.artifacts import read_checkpoint
+
+    read_checkpoint(next(tmp_path.glob("*.json")), artifact["metadata"])
 
 
 def test_pilot_entry_point_runs_as_a_real_sdk_task(protocol, tmp_path, monkeypatch):

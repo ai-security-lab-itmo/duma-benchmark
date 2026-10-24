@@ -158,7 +158,17 @@ class NLAssertionsEvaluator:
             messages=messages,
             **(DEFAULT_LLM_NL_ASSERTIONS_ARGS if judge_args is None else judge_args),
         )
-        result_data = json.loads(assistant_message.content)
+        response = assistant_message.content
+        if isinstance(response, str):
+            response = response.strip()
+            lines = response.splitlines()
+            if (
+                len(lines) >= 3
+                and lines[0] in {"```json", "```"}
+                and lines[-1] == "```"
+            ):
+                response = "\n".join(lines[1:-1])
+        result_data = json.loads(response)
         if not isinstance(result_data, dict) or not isinstance(
             result_data.get("results"), list
         ):

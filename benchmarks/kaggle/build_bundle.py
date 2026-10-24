@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -102,6 +103,13 @@ def build_bundle(
             raise ValueError(f"Expected an ordinary source file: {path}")
         contents[path.relative_to(root).as_posix()] = path.read_bytes()
     contents["protocol.json"] = protocol.read_bytes()
+    revision = runpy.run_path(
+        str(root / "src/duma/integrations/kaggle/task_revision.py")
+    )
+    protocol_version = json.loads(contents["protocol.json"])["version"]
+    revision["revise_assets"](contents, protocol_version)
+    is_v2 = protocol_version in revision["V2_PROTOCOLS"]
+    prefix = "duma-v2" if is_v2 else "duma"
     file_hashes = {
         name: hashlib.sha256(data).hexdigest() for name, data in contents.items()
     }
@@ -122,19 +130,25 @@ def build_bundle(
         .replace("__DUMA_EVALUATION_MODE__", evaluation)
         .replace(
             "__DUMA_TASK_NAME__",
-            "duma-runtime-check"
+            f"{prefix}-runtime-check"
             if evaluation == "check"
-            else "duma-pilot"
+            else f"{prefix}-pilot"
             if evaluation == "smoke"
-            else f"duma-{evaluation}",
+            else f"{prefix}-{evaluation}",
         )
         .replace("__DUMA_MANIFEST_SHA256__", manifest_digest)
     )
     metadata = {
-        "title": "DUMA Bench Private Pilot Runtime",
-        "id": f"{owner}/duma-bench-private-pilot-runtime",
+        "title": "DUMA Bench Private V2 Runtime"
+        if is_v2
+        else "DUMA Bench Private Pilot Runtime",
+        "id": f"{owner}/duma-bench-private-v2-runtime"
+        if is_v2
+        else f"{owner}/duma-bench-private-pilot-runtime",
         "licenses": [{"name": "MIT"}],
-        "description": "Private DUMA pilot code, original task assets and pinned pilot protocol. No model credentials or experiment results are included.",
+        "description": "Private DUMA Kaggle v2 code, explicitly revised task assets and pinned protocol. No model credentials or experiment results are included."
+        if is_v2
+        else "Private DUMA pilot code, original task assets and pinned pilot protocol. No model credentials or experiment results are included.",
     }
     (output / "dataset-metadata.json").write_text(json.dumps(metadata, indent=2))
     (output / "bundle-sha256.txt").write_text(digest + "\n")

@@ -57,6 +57,9 @@ class KaggleProtocol(BaseModel):
             raise ValueError("Select separate user and judge models for this protocol")
 
     def validate_data(self, data_dir: Path) -> None:
+        from duma.integrations.kaggle.task_revision import validate_revision
+
+        validate_revision(self.version, data_dir)
         for domain, task_ids in self.tasks.items():
             path = data_dir / "duma" / "domains" / domain / "tasks.json"
             available = {task["id"] for task in json.loads(path.read_text())}

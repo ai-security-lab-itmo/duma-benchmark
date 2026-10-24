@@ -113,6 +113,9 @@ def _execute(path, metadata, backends, protocol, domain, task_id, regime, trial)
                 max_steps=protocol.max_steps,
                 max_errors=protocol.max_errors,
                 seed=protocol.trial_seeds[trial],
+                on_simulation_complete=lambda result: artifact.update(
+                    simulation=result.model_dump(mode="json")
+                ),
             )
         artifact["simulation"] = simulation.model_dump(mode="json")
         if simulation.termination_reason in {
@@ -134,6 +137,9 @@ def _execute(path, metadata, backends, protocol, domain, task_id, regime, trial)
     except Exception as exc:
         artifact.setdefault("status", "technical_error")
         artifact["error_type"] = type(exc).__name__
+        judge_response = backends["duma-kaggle-judge"].last_response
+        if judge_response is not None:
+            artifact["judge_response"] = judge_response.model_dump(mode="json")
         raise
     finally:
         artifact["usage_by_role"] = {

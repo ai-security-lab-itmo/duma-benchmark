@@ -13,6 +13,7 @@ class KaggleBackend:
         self.llm = llm
         self.role = role
         self.calls: list[dict] = []
+        self.last_response: AssistantMessage | None = None
 
     def __call__(
         self,
@@ -58,7 +59,16 @@ class KaggleBackend:
         # Each turn gets exactly the history supplied by its DUMA participant.
         with kbench.chats.new(f"duma-{self.role}") as chat:
             tool_names = {}
+            gemini = genai or self.llm.name.startswith("google/gemini-")
+            first_turn = next(
+                (message for message in messages if message.role != "system"), None
+            )
             for message in messages:
+                # Reconstruct the same transport prefix on every solo replay.
+                if gemini and message is first_turn and message.role == "assistant":
+                    chat.append(
+                        SDKMessage(content="\n", sender=Actor(name="user", role="user"))
+                    )
                 sender = Actor(name=message.role, role=message.role)
                 if isinstance(message, ToolMessage):
                     content = ToolInvocationResult(
@@ -111,6 +121,12 @@ class KaggleBackend:
                             invocations.append(invocation)
                         sdk_message._meta["tool_calls"] = invocations
                 chat.append(sdk_message)
+            # Gemini requires a contents entry even for system-only solo starts.
+            # A newline survives SDK serialization without adding task instructions.
+            if gemini and messages and first_turn is None:
+                chat.append(
+                    SDKMessage(content="\n", sender=Actor(name="user", role="user"))
+                )
             response = self.llm.respond(tools=tools or None, **kwargs)
 
         calls = []
@@ -167,4 +183,5 @@ class KaggleBackend:
             },
         )
         result.validate()
+        self.last_response = result
         return result
