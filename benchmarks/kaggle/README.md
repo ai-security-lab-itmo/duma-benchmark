@@ -6,7 +6,8 @@ Private validation does not imply publication or merging.
 ## Hardened revision (2026-10-24)
 
 Domain hardening from `73c439c` and scoring/policy fixes are now in `main`
-(`09401e1`, `da2723a`) and merged into this branch. No experiment dumps or
+(`09401e1`, `da2723a`, plus negation regression fix `fd6972d`) and merged into
+this branch. No experiment dumps or
 legacy runner/provider changes were imported. Use `protocol.full.v3.json`
 or the three-task `protocol.pilot.v6.json` for these sources. The task count
 remains 35 across eight domains; five task IDs changed and ten tasks now have
@@ -24,6 +25,12 @@ This revision has not yet been uploaded or run on hosted models. Next: private
 readiness, one hosted episode, solo and communication checks, then a 36-episode
 pilot. Do not reuse v1/v2 checkpoints or append new results to their leaderboards.
 Infra over-quota checks include blocked attempts, not just executed harm.
+
+Offline validation: research environment with Kaggle SDK, 259 passed and 16
+live tests skipped; installed minimal wheel without SDK/full DUMA, 141 passed,
+one optional build-tool test skipped and one legacy-runner comparison deselected.
+All 35 bundled tasks load in both modes, with ten communication-scored tasks.
+Clean SDK installation validation remains part of the new hosted readiness gate.
 
 ## Architecture
 
