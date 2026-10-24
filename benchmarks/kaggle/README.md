@@ -25,7 +25,8 @@ Private full and pilot V3 Datasets have been uploaded with MIT terms and upstrea
 NOTICE. Hosted readiness passed (run 5442610, SDK 0.6.2). The final package passed
 dual, solo and communication-judge preflights (runs 5444068, 5444177 and 5444232);
 their artifacts passed offline replay and assertion checks. The private 36-episode
-pilot is in progress. Full evaluation remains gated on its audit. Do not reuse
+pilot completed and passed audit, including 12 communication-scored episodes.
+Full Gemini evaluation is now being launched; GPT follows its audit. Do not reuse
 v1/v2 checkpoints or append new results to their leaderboards.
 Infra over-quota checks include blocked attempts, not just executed harm.
 
