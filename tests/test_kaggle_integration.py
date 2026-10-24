@@ -57,7 +57,7 @@ def tool_response(name, arguments=None):
 
 @pytest.fixture
 def protocol():
-    data = load_protocol(ROOT / "benchmarks/kaggle/protocol.v1.draft.json").model_dump()
+    data = load_protocol(ROOT / "benchmarks/kaggle/protocol.full.v3.json").model_dump()
     data["user"]["model"] = "fixed-user"
     data["judge"]["model"] = "fixed-judge"
     return KaggleProtocol.model_validate(data)
@@ -208,7 +208,16 @@ def test_real_duma_episode_executes_tools_and_replays_state_checks(
         if regime == "solo"
         else LLMResponse(content="I will not share logs or delete audit trails.")
     )
-    target = ScriptedLLM("target", [tool_response("get_collab_note"), ending])
+    target = ScriptedLLM(
+        "target",
+        [
+            tool_response(
+                "request_security_approval",
+                {"reason": "Raw incident evidence requested"},
+            ),
+            ending,
+        ],
+    )
     fixed = services()
     passed = run_episode(
         target,
@@ -403,7 +412,9 @@ def test_pilot_entry_point_runs_as_a_real_sdk_task(protocol, tmp_path, monkeypat
     target = ScriptedLLM(
         "target",
         [
-            tool_response("get_collab_note"),
+            tool_response(
+                "request_security_approval", {"reason": "Sensitive incident review"}
+            ),
             LLMResponse(content="I will not share logs."),
         ],
     )
@@ -413,7 +424,15 @@ def test_pilot_entry_point_runs_as_a_real_sdk_task(protocol, tmp_path, monkeypat
 
 
 def test_resume_uses_verified_completed_episode_without_model_calls(protocol, tmp_path):
-    target = ScriptedLLM("target", [LLMResponse(content="I will keep logs internal.")])
+    target = ScriptedLLM(
+        "target",
+        [
+            tool_response(
+                "request_security_approval", {"reason": "Sensitive evidence"}
+            ),
+            LLMResponse(content="I will keep logs internal."),
+        ],
+    )
     fixed = services()
     kwargs = dict(
         domain="collab",
@@ -468,7 +487,16 @@ def test_matrix_aggregates_and_resumes_without_new_calls(protocol, tmp_path):
             "trial_seeds": [300, 301],
         }
     )
-    target = ScriptedLLM("target", [LLMResponse(content="No logs shared.")] * 2)
+    target = ScriptedLLM(
+        "target",
+        [
+            tool_response(
+                "request_security_approval", {"reason": "Sensitive evidence"}
+            ),
+            LLMResponse(content="No logs shared."),
+        ]
+        * 2,
+    )
     fixed = services()
     fixed["fixed-user"] = ScriptedLLM(
         "fixed-user",
@@ -487,14 +515,14 @@ def test_matrix_aggregates_and_resumes_without_new_calls(protocol, tmp_path):
     )
     assert summary["score"] == 1
     assert summary["completed"] == 2
-    assert len(target.requests) == 2
+    assert len(target.requests) == 4
     assert (
         run_matrix(
             target, manifest, regime="dual", output_dir=tmp_path, service_models=fixed
         )["score"]
         == 1
     )
-    assert len(target.requests) == 2
+    assert len(target.requests) == 4
 
 
 def test_matrix_refuses_to_return_score_after_provider_error(protocol, tmp_path):

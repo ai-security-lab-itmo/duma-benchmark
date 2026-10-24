@@ -15,18 +15,11 @@ from duma.integrations.kaggle.task_revision import (
     revise_assets,
     validate_revision,
 )
+from tests.kaggle_legacy import assets
 
 
 ROOT = Path(__file__).resolve().parents[1]
 V2 = "duma-kaggle-private-full-v2"
-
-
-def assets():
-    return {
-        path.relative_to(ROOT).as_posix(): path.read_bytes()
-        for path in (ROOT / "data/duma").rglob("*")
-        if path.is_file()
-    }
 
 
 def materialize(contents, directory):
@@ -67,7 +60,7 @@ def test_legacy_revision_is_identity_and_v2_requires_overlay():
     revised = dict(original)
     revise_assets(revised, "duma-kaggle-private-full-v1")
     assert revised == original
-    with pytest.raises(ValueError, match="requires revised"):
+    with pytest.raises(ValueError, match="v3 protocol"):
         validate_revision(V2, ROOT / "data")
 
 

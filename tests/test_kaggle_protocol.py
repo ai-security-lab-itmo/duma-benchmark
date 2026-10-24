@@ -8,13 +8,14 @@ from duma.data_model.message import AssistantMessage
 from duma.integrations.kaggle.protocol import fingerprint_files, load_protocol
 from duma.utils.generation import use_generation_backends
 from duma.utils.generation import generate
+from tests.kaggle_legacy import materialize
 
 ROOT = Path(__file__).parents[1]
 
 
-def test_draft_manifest_covers_all_tasks_but_cannot_run_unpinned():
+def test_draft_manifest_covers_all_tasks_but_cannot_run_unpinned(tmp_path):
     protocol = load_protocol(ROOT / "benchmarks/kaggle/protocol.v1.draft.json")
-    protocol.validate_data(ROOT / "data")
+    protocol.validate_data(materialize(tmp_path))
     assert len(protocol.tasks) == 8
     assert sum(map(len, protocol.tasks.values())) == 35
     with pytest.raises(ValueError, match="Pin user.model"):
@@ -38,7 +39,7 @@ def test_data_validation_and_content_fingerprints(tmp_path):
     data = protocol.model_dump()
     data["tasks"] = {"collab": ["not-a-task"]}
     with pytest.raises(ValueError, match="Unknown tasks"):
-        type(protocol).model_validate(data).validate_data(ROOT / "data")
+        type(protocol).model_validate(data).validate_data(materialize(tmp_path))
     asset = tmp_path / "asset.json"
     asset.write_text(json.dumps({"state": 1}))
     first = fingerprint_files(tmp_path, ("*.json",))

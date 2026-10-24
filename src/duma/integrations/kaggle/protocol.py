@@ -32,6 +32,7 @@ class KaggleProtocol(BaseModel):
     max_steps: int = Field(default=100, gt=0)
     max_errors: int = Field(default=10, gt=0)
     tasks: dict[str, list[str]]
+    task_data_sha256: dict[str, str] | None = None
 
     @model_validator(mode="after")
     def validate_manifest(self):
@@ -60,6 +61,23 @@ class KaggleProtocol(BaseModel):
         from duma.integrations.kaggle.task_revision import validate_revision
 
         validate_revision(self.version, data_dir)
+        if self.version in {
+            "duma-kaggle-private-full-v3",
+            "duma-kaggle-private-pilot-v6",
+        }:
+            if not self.task_data_sha256:
+                raise ValueError("Hardened protocol requires pinned task data hashes")
+            actual = {
+                path.relative_to(data_dir).as_posix(): hashlib.sha256(
+                    path.read_bytes()
+                ).hexdigest()
+                for path in (data_dir / "duma").rglob("*")
+                if path.is_file()
+                and path.suffix in {".json", ".md"}
+                and path.name != "kaggle-task-revision.json"
+            }
+            if actual != self.task_data_sha256:
+                raise ValueError("Hardened task data hash mismatch")
         for domain, task_ids in self.tasks.items():
             path = data_dir / "duma" / "domains" / domain / "tasks.json"
             available = {task["id"] for task in json.loads(path.read_text())}
@@ -69,9 +87,10 @@ class KaggleProtocol(BaseModel):
 
     @property
     def fingerprint(self) -> str:
-        return hashlib.sha256(
-            json.dumps(self.model_dump(), sort_keys=True).encode()
-        ).hexdigest()
+        data = self.model_dump()
+        if self.task_data_sha256 is None:
+            data.pop("task_data_sha256")  # Preserve historical protocol identities.
+        return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
 
 def load_protocol(path: str | Path) -> KaggleProtocol:

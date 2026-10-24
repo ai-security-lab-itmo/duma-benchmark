@@ -16,6 +16,7 @@ pytest.importorskip(
 
 from duma.integrations.kaggle.protocol import load_protocol
 from duma.utils.utils import DATA_DIR
+from tests.kaggle_legacy import build_root, materialize
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,21 +25,21 @@ build_bundle = runpy.run_path(str(ROOT / "benchmarks/kaggle/build_bundle.py"))[
 ]
 
 
-def test_pilot_protocol_uses_available_pinned_models():
+def test_pilot_protocol_uses_available_pinned_models(tmp_path):
     protocol = load_protocol(ROOT / "benchmarks/kaggle/protocol.pilot.v1.json")
     protocol.require_service_models()
-    protocol.validate_data(DATA_DIR)
+    protocol.validate_data(materialize(tmp_path))
     assert len(protocol.tasks) == 3
     assert protocol.max_steps == 40
     assert protocol.user.model.startswith("google/")
     assert protocol.judge.model.startswith("google/")
 
 
-def test_pilot_v3_only_changes_target_reasoning_and_version():
+def test_pilot_v3_only_changes_target_reasoning_and_version(tmp_path):
     previous = load_protocol(ROOT / "benchmarks/kaggle/protocol.pilot.v1.json")
     current = load_protocol(ROOT / "benchmarks/kaggle/protocol.pilot.v3.json")
     current.require_service_models()
-    current.validate_data(DATA_DIR)
+    current.validate_data(materialize(tmp_path))
     expected = previous.model_dump()
     expected["version"] = "duma-kaggle-private-pilot-v3"
     expected["agent"]["reasoning"] = "none"
@@ -46,11 +47,11 @@ def test_pilot_v3_only_changes_target_reasoning_and_version():
     assert current.fingerprint != previous.fingerprint
 
 
-def test_pilot_v4_only_changes_turn_limit_and_version():
+def test_pilot_v4_only_changes_turn_limit_and_version(tmp_path):
     previous = load_protocol(ROOT / "benchmarks/kaggle/protocol.pilot.v3.json")
     current = load_protocol(ROOT / "benchmarks/kaggle/protocol.pilot.v4.json")
     current.require_service_models()
-    current.validate_data(DATA_DIR)
+    current.validate_data(materialize(tmp_path))
     expected = previous.model_dump()
     expected["version"] = "duma-kaggle-private-pilot-v4"
     expected["max_steps"] = 100
@@ -58,14 +59,14 @@ def test_pilot_v4_only_changes_turn_limit_and_version():
     assert current.fingerprint != previous.fingerprint
 
 
-def test_full_protocol_preserves_all_tasks_and_validated_model_settings():
+def test_full_protocol_preserves_all_tasks_and_validated_model_settings(tmp_path):
     from duma.integrations.kaggle.metrics import evaluation_rows
 
     current = load_protocol(ROOT / "benchmarks/kaggle/protocol.full.v1.json")
     pilot = load_protocol(ROOT / "benchmarks/kaggle/protocol.pilot.v4.json")
     draft = load_protocol(ROOT / "benchmarks/kaggle/protocol.v1.draft.json")
     current.require_service_models()
-    current.validate_data(DATA_DIR)
+    current.validate_data(materialize(tmp_path))
     expected = pilot.model_dump()
     expected.update(
         version="duma-kaggle-private-full-v1",
@@ -81,7 +82,7 @@ def test_full_protocol_preserves_all_tasks_and_validated_model_settings():
 
 
 def test_bundle_is_reproducible_and_excludes_credentials(tmp_path):
-    protocol = ROOT / "benchmarks/kaggle/protocol.pilot.v1.json"
+    protocol = ROOT / "benchmarks/kaggle/protocol.pilot.v6.json"
     first, second = tmp_path / "first", tmp_path / "second"
     digest = build_bundle(ROOT, first, protocol, "example")
     assert build_bundle(ROOT, second, protocol, "example") == digest
@@ -124,7 +125,7 @@ def test_bundle_is_reproducible_and_excludes_credentials(tmp_path):
     assert "__DUMA_MANIFEST_SHA256__" not in hosted
     compile(hosted, "hosted_pilot.py", "exec")
     metadata = json.loads((first / "dataset-metadata.json").read_text())
-    assert metadata["id"] == "example/duma-bench-private-pilot-runtime"
+    assert metadata["id"] == "example/duma-bench-private-v3-runtime"
     assert "isPublic" not in metadata
     with pytest.raises(FileExistsError):
         build_bundle(ROOT, first, protocol, "example")
@@ -182,7 +183,7 @@ def test_hosted_smoke_returns_declared_float(monkeypatch, passed):
 def test_hosted_assets_verify_archived_and_kaggle_extracted_data(tmp_path, extracted):
     output = tmp_path / "dataset"
     digest = build_bundle(
-        ROOT, output, ROOT / "benchmarks/kaggle/protocol.pilot.v1.json", "example"
+        ROOT, output, ROOT / "benchmarks/kaggle/protocol.pilot.v6.json", "example"
     )
     archive_path = output / "duma-pilot.zip"
     with zipfile.ZipFile(archive_path) as archive:
@@ -195,7 +196,7 @@ def test_hosted_assets_verify_archived_and_kaggle_extracted_data(tmp_path, extra
     runtime = tmp_path / "runtime"
     copy_assets(output, runtime, digest, manifest_digest)
     assert (runtime / "protocol.json").read_bytes() == (
-        ROOT / "benchmarks/kaggle/protocol.pilot.v1.json"
+        ROOT / "benchmarks/kaggle/protocol.pilot.v6.json"
     ).read_bytes()
     if extracted:
         (output / "duma-pilot/protocol.json").write_text("tampered")
@@ -223,7 +224,8 @@ def test_host_check_rejects_full_distribution_and_unsupported_sdk(monkeypatch):
 
 def test_v2_bundle_contains_only_explicit_versioned_task_changes(tmp_path):
     protocol = ROOT / "benchmarks/kaggle/protocol.full.v2.json"
-    build_bundle(ROOT, tmp_path / "v2", protocol, "example")
+    legacy = build_root(tmp_path / "legacy")
+    build_bundle(legacy, tmp_path / "v2", protocol, "example")
     metadata = json.loads((tmp_path / "v2/dataset-metadata.json").read_text())
     assert metadata["id"] == "example/duma-bench-private-v2-runtime"
     assert (
@@ -235,7 +237,7 @@ def test_v2_bundle_contains_only_explicit_versioned_task_changes(tmp_path):
         for name, expected in marker["revised_sha256"].items():
             assert hashlib.sha256(archive.read(name)).hexdigest() == expected
             assert (
-                hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
+                hashlib.sha256((legacy / name).read_bytes()).hexdigest()
                 == marker["original_sha256"][name]
             )
         tasks = json.loads(
@@ -251,5 +253,5 @@ def test_v2_bundle_contains_only_explicit_versioned_task_changes(tmp_path):
         )
         assert (
             archive.read("data/duma/domains/mail_rag_phishing/tasks.json")
-            == (ROOT / "data/duma/domains/mail_rag_phishing/tasks.json").read_bytes()
+            == (legacy / "data/duma/domains/mail_rag_phishing/tasks.json").read_bytes()
         )

@@ -12,9 +12,9 @@ from pydantic import BaseModel
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_all_35_tasks_match_pre_refactor_contract():
+def test_all_35_hardened_tasks_match_versioned_contract():
     expected = json.loads(
-        (ROOT / "tests/fixtures/kaggle-task-contract.json").read_text()
+        (ROOT / "tests/fixtures/kaggle-task-contract.v3.json").read_text()
     )
     actual = runpy.run_path(str(ROOT / "tests/kaggle_reference.py"))["task_contract"]()
     assert len(actual["tasks"]) == 35
@@ -22,10 +22,11 @@ def test_all_35_tasks_match_pre_refactor_contract():
 
 
 def test_recorded_trajectories_and_scores_match_original_runner():
-    expected = json.loads(
-        (ROOT / "tests/fixtures/kaggle-recorded-replays.json").read_text()
-    )
-    actual = runpy.run_path(str(ROOT / "tests/kaggle_replay.py"))["replays"](run_task)
+    from duma.run import run_task as legacy_run_task
+
+    replay = runpy.run_path(str(ROOT / "tests/kaggle_replay.py"))["replays"]
+    expected = replay(legacy_run_task)
+    actual = replay(run_task)
     assert json.loads(json.dumps(actual)) == expected
 
 
@@ -109,12 +110,25 @@ def test_user_side_tools_and_replay_are_preserved(monkeypatch):
             AssistantMessage(role="assistant", content="###STOP###"),
         ]
     )
+    target_responses = iter(
+        [
+            lambda: AssistantMessage(
+                role="assistant",
+                tool_calls=[
+                    ToolCall(
+                        id="approval",
+                        name="request_security_approval",
+                        arguments={"reason": "Sensitive evidence"},
+                    )
+                ],
+            ),
+            lambda: AssistantMessage(role="assistant", content="Kept logs internal."),
+        ]
+    )
     with use_generation_backends(
         {
             "test-user": lambda **_: next(responses),
-            "test-target": lambda **_: AssistantMessage(
-                role="assistant", content="Kept logs internal."
-            ),
+            "test-target": lambda **_: next(target_responses)(),
         }
     ):
         result = run_task(

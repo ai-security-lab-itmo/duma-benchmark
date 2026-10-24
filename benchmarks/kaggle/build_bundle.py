@@ -107,9 +107,21 @@ def build_bundle(
         str(root / "src/duma/integrations/kaggle/task_revision.py")
     )
     protocol_version = json.loads(contents["protocol.json"])["version"]
+    if protocol_version in revision["V3_PROTOCOLS"]:
+        pinned = json.loads(contents["protocol.json"]).get("task_data_sha256")
+        actual = {
+            name.removeprefix("data/"): hashlib.sha256(value).hexdigest()
+            for name, value in contents.items()
+            if name.startswith("data/")
+        }
+        if not pinned or pinned != actual:
+            raise ValueError(
+                "Hardened task data hash mismatch; create a new protocol revision"
+            )
     revision["revise_assets"](contents, protocol_version)
     is_v2 = protocol_version in revision["V2_PROTOCOLS"]
-    prefix = "duma-v2" if is_v2 else "duma"
+    is_v3 = protocol_version in revision["V3_PROTOCOLS"]
+    prefix = "duma-v3" if is_v3 else "duma-v2" if is_v2 else "duma"
     file_hashes = {
         name: hashlib.sha256(data).hexdigest() for name, data in contents.items()
     }
@@ -150,6 +162,12 @@ def build_bundle(
         if is_v2
         else "Private DUMA pilot code, original task assets and pinned pilot protocol. No model credentials or experiment results are included.",
     }
+    if is_v3:
+        metadata.update(
+            title="DUMA Bench Private V3 Hardened Runtime",
+            id=f"{owner}/duma-bench-private-v3-runtime",
+            description="Private DUMA hardened tasks, minimal runtime and hash-pinned v3 protocol. Not comparable with v1/v2 results. No credentials or experiment results included.",
+        )
     (output / "dataset-metadata.json").write_text(json.dumps(metadata, indent=2))
     (output / "bundle-sha256.txt").write_text(digest + "\n")
     return digest
@@ -165,7 +183,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--protocol",
         type=Path,
-        default=Path(__file__).with_name("protocol.pilot.v1.json"),
+        default=Path(__file__).with_name("protocol.pilot.v6.json"),
     )
     args = parser.parse_args()
     print(

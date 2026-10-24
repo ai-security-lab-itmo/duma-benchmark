@@ -3,6 +3,28 @@
 Work stays on `codex/kaggle-benchmarks`; see the [migration plan](../../docs/kaggle-migration-plan.md).
 Private validation does not imply publication or merging.
 
+## Hardened revision (2026-10-24)
+
+Domain hardening from `73c439c` and scoring/policy fixes are now in `main`
+(`09401e1`, `da2723a`) and merged into this branch. No experiment dumps or
+legacy runner/provider changes were imported. Use `protocol.full.v3.json`
+or the three-task `protocol.pilot.v6.json` for these sources. The task count
+remains 35 across eight domains; five task IDs changed and ten tasks now have
+communication scoring. The pinned user/judge and generation settings are
+unchanged from full-v2. Full-v3 is 105 episodes per target and regime.
+
+V3 pins every task/data/prompt file hash and adds a bundle revision manifest.
+The builder rejects historical protocols with hardened data. Historical v1/v2
+results, protocols and fixtures are preserved; reproducing their original runs
+requires the frozen checkout/bundle, not this branch's new domain classes.
+`tests/fixtures/kaggle-legacy-data.zip` is a historical data test fixture from
+`39bb64b`, not a replacement for that original runtime.
+
+This revision has not yet been uploaded or run on hosted models. Next: private
+readiness, one hosted episode, solo and communication checks, then a 36-episode
+pilot. Do not reuse v1/v2 checkpoints or append new results to their leaderboards.
+Infra over-quota checks include blocked attempts, not just executed harm.
+
 ## Architecture
 
 `duma-kaggle-runtime` contains shared domain sources, orchestration, models,
@@ -23,8 +45,8 @@ Install `pdm-backend` in the local build environment only:
 
 ```bash
 python benchmarks/kaggle/build_bundle.py --owner ivanblch \
-  --output .cache/kaggle-minimal-check --evaluation check \
-  --protocol benchmarks/kaggle/protocol.v1.draft.json
+  --output .cache/kaggle-v3-check --evaluation check \
+  --protocol benchmarks/kaggle/protocol.full.v3.json
 ```
 
 The bundle includes a deterministic wheel, original JSON/Markdown, protocol,
@@ -32,17 +54,17 @@ LICENSE and a hash-pinned task. Credentials, `.env`, caches and experimental
 results are excluded. Neither the research pyproject nor its lock is deployed.
 Both archived and Kaggle-extracted assets are verified before installation.
 
-The CLI defaults to `check`: `duma-runtime-check` validates installation and
+The CLI defaults to `check`: `duma-v3-runtime-check` validates installation and
 assets without model inference. Its result is readiness, not a security score.
 
-For authorized private updates:
+For authorized private updates after creating the new private v3 Dataset:
 
 ```bash
-kaggle datasets version -p .cache/kaggle-minimal-check -t \
+kaggle datasets version -p .cache/kaggle-v3-check -t \
   -m 'Minimal runtime readiness bundle'
-kaggle benchmarks tasks push duma-runtime-check \
-  -f .cache/kaggle-minimal-check/hosted_pilot.py \
-  -d ivanblch/duma-bench-private-pilot-runtime
+kaggle benchmarks tasks push duma-v3-runtime-check \
+  -f .cache/kaggle-v3-check/hosted_pilot.py \
+  -d ivanblch/duma-bench-private-v3-runtime
 ```
 
 **Each task push automatically starts validation.** Never push an inference
@@ -61,7 +83,7 @@ models must be pinned before inference. The diagnostic pilot has three tasks and
 shorter limits, a different protocol. SDK model keys include provider prefixes.
 Do not silently substitute unavailable services or omit communication checks.
 
-The current private pilot uses `protocol.pilot.v4.json`: three tasks, two regimes,
+The earlier private pilot used `protocol.pilot.v4.json`: three tasks, two regimes,
 seeds 300--302, 100 steps and 3 errors. Earlier v3 used 40 steps. Target reasoning
 is `none` for both Gemini 3.8 Flash and GPT-5.4 mini; user/judge settings are
 unchanged from `protocol.pilot.v1.json` (protocol version v2). Keep protocols and
