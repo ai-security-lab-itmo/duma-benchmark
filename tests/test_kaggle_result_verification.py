@@ -58,6 +58,51 @@ def test_complete_audit_recomputes_hosted_summary(examples, tmp_path, monkeypatc
     assert not audit(tmp_path, bundle, protocol, ["target"])["complete"]
 
 
+def test_preflight_audit_accepts_valid_failure_and_rejects_extra_rows(
+    examples, tmp_path, monkeypatch
+):
+    from duma.integrations.kaggle.artifacts import write_checkpoint
+
+    protocol, rows = examples
+    row = deepcopy(rows["dual-safe"])
+    row["metadata"].update(target_model="target", trial=0, seed=300)
+    folder = tmp_path / "run/duma-kaggle-results"
+    folder.mkdir(parents=True)
+    write_checkpoint(folder / "episode.json", row)
+    fn = runpy.run_path(str(ROOT / "benchmarks/kaggle/verify_results.py"))[
+        "audit_preflight"
+    ]
+    monkeypatch.setitem(fn.__globals__, "wheel_identity", lambda _: "source")
+    monkeypatch.setitem(fn.__globals__, "fingerprint_files", lambda *_: "data")
+    args = (
+        tmp_path,
+        tmp_path / "unused",
+        protocol,
+        "target",
+        ("collab", "collab_poisoning_logs", "dual"),
+    )
+    report = fn(*args)
+    assert report["complete"] and report["phase"] == "preflight"
+    assert report["score"] == 0.0
+    write_checkpoint(folder / "duplicate.json", row)
+    with pytest.raises(ValueError, match="exactly one"):
+        fn(*args)
+
+
+def test_aggregate_roundoff_tolerance_does_not_change_counts_or_unknown_cost():
+    equal = runpy.run_path(str(ROOT / "benchmarks/kaggle/verify_results.py"))[
+        "same_summary"
+    ]
+    assert equal(
+        {"score": 1 / 3, "cost": 0.1 + 0.2}, {"score": 0.3333333333333333, "cost": 0.3}
+    )
+    assert not equal({"score": 0.333333}, {"score": 0.333334})
+    assert not equal({"completed": 36}, {"completed": 35})
+    assert not equal({"completed": 36}, {"completed": 36.0})
+    assert not equal({"cost": None}, {"cost": 0.0})
+    assert not equal(float("nan"), float("nan"))
+
+
 @pytest.fixture(scope="module")
 def examples():
     protocol = load_protocol(ROOT / "benchmarks/kaggle/protocol.full.v3.json")

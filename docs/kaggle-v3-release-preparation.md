@@ -141,3 +141,52 @@ readiness before pushing the already prepared preflights and pilot wrappers.
 Avoid `push --wait` on an already pending task: installed CLI 2.2.4 ignores its
 initial wait timeout and still attempts a new version. Use read-only waiting
 and a separate push after observing terminal state.
+
+### Readiness Passed; Resume (2026-10-24)
+
+Run 5442610 / `duma-v3-runtime-check/1` completed at 19:51:59 UTC
+(23:51:59 Asia/Tbilisi). Downloaded outputs confirm `No broken requirements found`,
+Kaggle SDK 0.6.2, minimal runtime 0.1.0, no full DUMA distribution, and successful
+protocol/data validation for all 35 tasks. The 1.0 result is installation readiness,
+not a security measurement. Artifacts: `.cache/kaggle-v3-initial-readiness-results`.
+
+The initial and final bundles' `duma/` Python files and all data files were compared
+byte-for-byte and match. Only LICENSE/NOTICE packaging and distribution metadata
+changed. To avoid repeating an otherwise identical standalone readiness run,
+final-package installation is checked in the first dual preflight bootstrap:
+manifest verification, clean-host/SDK compatibility, wheel installation, `pip check`
+and full protocol/data validation must succeed before any inference. No task,
+generation, scoring or retry settings change. Solo and communication preflights
+remain gated on this first episode. This supersedes the separate zero-model
+final-package readiness push described above.
+
+Quota before preflight is unchanged: daily $1.10744015 / $10 used, monthly
+$9.0103096 / $100 used. No readiness inference cost was observed.
+
+### Preflights Passed; Pilot Started (2026-10-25 Asia/Tbilisi)
+
+The final NOTICE-containing package passed all three Gemini preflights:
+dual collab run 5444068, solo collab run 5444177, and communication run 5444232
+(`output_handling/output_xss_block`). Each completed row was audited using the
+frozen installed wheel: integrity hashes, tool-response/state replay, environment
+assertions and judge-call/schema consistency. Communication scoring was present
+in exactly the expected preflight. Reports are under
+`.cache/kaggle-v3-preflight-results/{dual,solo,communication}`.
+These one-row diagnostics are not full benchmark scores.
+
+Private pilot tasks `duma-v3-pilot-solo/1` and `duma-v3-pilot-dual/1` were pushed
+with the approved pilot Dataset. Gemini validation runs are 5444250 and 5444255.
+The local foreground driver `benchmarks/kaggle/private_pilot.py` adopts existing
+tasks/runs, audits Gemini before scheduling GPT, checks both free quota periods,
+and stops on technical failure or duplicate attempts. It does not publish, update
+Datasets, retry failed episodes or install any recurring automation.
+
+The auditor permits only finite aggregate-float roundoff (1e-12 tolerance), because
+artifact enumeration can alter summation order. Counts, coverage, per-episode
+scores, assertions, identities and hashes retain strict checks. No frozen runtime,
+task data or protocol settings were changed.
+
+Local regression after adding preflight auditing and the foreground driver:
+281 passed, 16 live skips; Ruff passed. Full solo/dual wrappers are prepared in
+`.cache/kaggle-v3-full-{solo,dual}`; both archive hashes equal the final full
+bundle hash above. They are not pushed until the pilot is audited.

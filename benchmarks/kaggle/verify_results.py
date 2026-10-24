@@ -7,6 +7,7 @@ import argparse
 from collections import Counter, defaultdict
 import hashlib
 import json
+import math
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -102,6 +103,72 @@ def verify_episode(item, protocol, source, data, sdk="0.6.2"):
     }
 
 
+def audit_preflight(results, bundle, protocol, target, episode, sdk="0.6.2"):
+    """Verify a declared single episode, not a full-matrix security score."""
+    protocol.validate_data(DATA_DIR)
+    source = wheel_identity(bundle)
+    data = fingerprint_files(
+        DATA_DIR / "duma", ("domains/**/*.*", "user_simulator/*.md")
+    )
+    paths = list(results.glob("**/duma-kaggle-results/*.json"))
+    if len(paths) != 1:
+        raise ValueError("Preflight requires exactly one episode artifact")
+    raw = json.loads(paths[0].read_text())
+    item = read_checkpoint(paths[0], raw["metadata"])
+    meta = item["metadata"]
+    domain, task, regime = episode
+    if (
+        meta["target_model"],
+        meta["domain"],
+        meta["task_id"],
+        meta["regime"],
+        meta["trial"],
+        meta["seed"],
+    ) != (target, domain, task, regime, 0, protocol.trial_seeds[0]):
+        raise ValueError("Unexpected preflight row")
+    checked = verify_episode(item, protocol, source, data, sdk)
+    if checked is None:
+        raise ValueError("Preflight did not complete; inspect the original artifact")
+    return {
+        "complete": True,
+        "expected": 1,
+        "observed": 1,
+        "phase": "preflight",
+        "scope": "One diagnostic episode; not a full-matrix leaderboard score",
+        "score": item["score"],
+        "protocol_hash": protocol.fingerprint,
+        "source_hash": source,
+        "data_hash": data,
+        "artifact_hash_verified": item["artifact_hash"],
+        "nl_scored_rows": int(checked["nl_scored"]),
+        **checked,
+    }
+
+
+def same_summary(actual, stored):
+    """Only aggregate floats tolerate roundoff; counts, identities and nulls do not."""
+    if isinstance(actual, dict):
+        return (
+            isinstance(stored, dict)
+            and actual.keys() == stored.keys()
+            and all(same_summary(value, stored[key]) for key, value in actual.items())
+        )
+    if isinstance(actual, list):
+        return (
+            isinstance(stored, list)
+            and len(actual) == len(stored)
+            and all(same_summary(a, b) for a, b in zip(actual, stored, strict=True))
+        )
+    if isinstance(actual, float):
+        return (
+            type(stored) in (float, int)
+            and math.isfinite(actual)
+            and math.isfinite(stored)
+            and math.isclose(actual, stored, rel_tol=1e-12, abs_tol=1e-12)
+        )
+    return type(actual) is type(stored) and actual == stored
+
+
 def audit(results, bundle, protocol, targets, sdk="0.6.2"):
     protocol.validate_data(DATA_DIR)
     source = wheel_identity(bundle)
@@ -183,7 +250,7 @@ def audit(results, bundle, protocol, targets, sdk="0.6.2"):
                 raise ValueError("Duplicate matrix summary")
             actual = aggregate(items, protocol, target, regime)
             if any(
-                stored.get(field) != json.loads(json.dumps(value))
+                not same_summary(json.loads(json.dumps(value)), stored.get(field))
                 for field, value in actual.items()
             ):
                 raise ValueError("Hosted summary differs from independent aggregation")
@@ -220,11 +287,20 @@ if __name__ == "__main__":
     parser.add_argument("--protocol", type=Path, required=True)
     parser.add_argument("--target", action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--episode", nargs=3, metavar=("DOMAIN", "TASK", "REGIME"))
     args = parser.parse_args()
     logger.remove()
     if args.output.exists():
         raise FileExistsError("Audit reports are immutable; use a new output path")
-    report = audit(args.results, args.bundle, load_protocol(args.protocol), args.target)
+    protocol = load_protocol(args.protocol)
+    if args.episode:
+        if len(args.target) != 1:
+            raise ValueError("A preflight has exactly one target")
+        report = audit_preflight(
+            args.results, args.bundle, protocol, args.target[0], args.episode
+        )
+    else:
+        report = audit(args.results, args.bundle, protocol, args.target)
     write_checkpoint(args.output, report)
     print(
         json.dumps(
