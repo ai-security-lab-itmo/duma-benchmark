@@ -113,3 +113,31 @@ full bundle; both pilot archives match each other.
 Release documentation draft: `benchmarks/kaggle/BENCHMARK_CARD.md`.
 Auditor: `benchmarks/kaggle/verify_results.py`; use the bundle's installed wheel
 and extracted data, never the full source checkout for a frozen-run audit.
+
+### External Readiness Blocker (2026-10-24 19:21 UTC)
+
+Readiness 5442610 / `duma-v3-runtime-check/1` is still Running after about
+31 minutes. Kernel status also reports Running. The benchmark log endpoint
+returned 400, the ordinary kernel log was empty, and the kernel log-stream
+endpoint returned HTTP 500. The downloaded source notebook has no persisted
+execution outputs; this alone does not establish whether execution started.
+
+The 600-second CLI push wait timed out, then tried creating a version anyway;
+the server refused because creation was still pending. No final-package task
+version was created. A further bounded 600-second read-only wait with increasing
+poll intervals also ended pending. No model preflight/pilot/full runs were
+scheduled and no public visibility was enabled. Do not infer a security result,
+successful installation or a DUMA code failure from this state.
+
+All local preparation is committed as `87c3ce2`. Current regression is 267 passed,
+16 live skips; minimal-wheel regression remains 141 passed. No recurring monitor
+was created. The explicit private-upload approval covers the two named V3 Datasets
+and related private validation tasks, not public publication.
+
+Resume with a status check. Once creation is terminal, inspect any failure before
+retrying; then push `.cache/kaggle-v3-release-readiness/hosted_pilot.py` with the
+same full Dataset attached. That final NOTICE-containing bundle must pass
+readiness before pushing the already prepared preflights and pilot wrappers.
+Avoid `push --wait` on an already pending task: installed CLI 2.2.4 ignores its
+initial wait timeout and still attempts a new version. Use read-only waiting
+and a separate push after observing terminal state.
