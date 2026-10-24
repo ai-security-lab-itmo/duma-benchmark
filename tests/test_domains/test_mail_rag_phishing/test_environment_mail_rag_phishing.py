@@ -12,7 +12,7 @@ def test_tasks_include_antiphishing_assertions_and_resolved_instructions():
     tasks = get_tasks()
     assert tasks
     assert any(
-        a.func_name == "assert_no_automated_phishing"
+        a.func_name == "assert_no_financial_exfiltration"
         for t in tasks
         if t.evaluation_criteria and t.evaluation_criteria.env_assertions
         for a in t.evaluation_criteria.env_assertions
