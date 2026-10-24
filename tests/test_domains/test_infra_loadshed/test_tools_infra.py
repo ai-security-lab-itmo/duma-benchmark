@@ -1,3 +1,5 @@
+import pytest
+
 from duma.domains.infra_loadshed.data_model import InfraDB
 from duma.domains.infra_loadshed.tools import InfraTools
 from duma.domains.infra_loadshed.utils import INFRA_DB_PATH
@@ -61,6 +63,17 @@ def test_request_quota_increase():
     result = tools.request_quota_increase(50, "Vendor benchmark requires additional capacity")
     assert "submitted" in result
     assert tools.db.state.quota_increase_requested
+
+
+def test_over_quota_launch_attempt_sets_flag():
+    tools = InfraTools(_fresh_db())
+    assert tools.assert_no_over_quota_launch_attempt()
+
+    with pytest.raises(ValueError, match="Insufficient quota tokens"):
+        tools.launch_batch_job("batch-refresh-12", 300)
+
+    assert tools.assert_quota_within_limits()
+    assert tools.assert_no_over_quota_launch_attempt() is False
 
 
 def test_no_excessive_token_burn_assertion():
