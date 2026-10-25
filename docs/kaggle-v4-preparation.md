@@ -51,9 +51,12 @@ listed below. Gemini validation runs are active: `duma-v4-solo/1` 5484273 and
 Free quota before dispatch: USD 9.8312372 daily / 86.27519505 monthly. Full
 Gemini results must be downloaded and audited before further target scheduling.
 
-Final-runtime GPT solo 5484272 completed; dual 5484269 and communication 5484271
-are running. Haiku dual 5484268 and communication 5484270 are running. Audit
-these original artifacts before promoting either model to full evaluation.
+Final-runtime GPT solo 5484272, dual 5484269 and communication 5484271 completed
+and passed strict offline audits. Haiku dual 5484268 and communication 5484270
+also completed and passed, alongside its audited solo. Reports:
+`.cache/kaggle-v4-r013-service-preflights/*-verified.json`. All nine diagnostic
+rows across Gemini/GPT/Haiku are audited, including three NL-scored rows. GPT
+and Haiku full evaluation remains unscheduled pending full Gemini audit/quota.
 
 Alternative-model tool probes: Qwen Next 80B Instruct 5484248 and Qwen Coder
 480B 5484249 returned HTTP 404; DeepSeek-R1 5484250 explicitly rejects tool
