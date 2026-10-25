@@ -40,6 +40,40 @@ do not schedule the entire matrix blindly or buy paid API capacity.
 
 ### Active Full Evaluation
 
+Manual follow-up, 2026-10-26: both original Gemini full runs remain running.
+Bounded live-log snapshots at approximately 620 elapsed seconds contained 44
+distinct solo episode-start lines and 17 dual starts, with zero generation-error
+lines. These counters are progress diagnostics, not completed coverage or valid
+scores. Do not infer final ASR, retry rows, or launch duplicate full tasks.
+Latest quota snapshot: USD 9.39492835 daily / 85.8388862 monthly remaining.
+
+The installed 0.1.3 wheel passed 30 protocol/metrics/revision tests (one optional
+build-tool skip) plus five runtime tests (one legacy comparison deselected),
+using `python -m pytest --noconftest` and the unchanged source data. Initial
+collection via the full repository conftest imported intentionally excluded
+`duma.run`; disabling that research-only conftest resolved collection without
+adding a runtime dependency or changing the tests. Historical full-research
+regression remains 293 passed / 16 skipped.
+
+When both original runs are terminal, download them with source notebooks into
+`.cache/kaggle-v4-full-results`, then audit using the installed frozen wheel:
+
+```sh
+env DUMA_DATA_DIR="$PWD/.cache/kaggle-v4-r013-assets/data" \
+  .cache/kaggle-v4-minimal-env/bin/python benchmarks/kaggle/verify_results.py \
+  --results .cache/kaggle-v4-full-results \
+  --bundle .cache/kaggle-v4-r013-runtime/duma-pilot.zip \
+  --protocol benchmarks/kaggle/protocol.full.v4.json \
+  --target google/gemini-3.8-flash \
+  --output .cache/kaggle-v4-full-results/verified-gemini.json
+```
+
+Require 210/210 complete, all scoring checks and matching identities before
+next-target dispatch. Inspect original errored rows if incomplete; never
+relabel technical failures as attacks. Re-read free quota, then schedule GPT
+and Haiku in budget-aware stages on existing `duma-v4-solo`/`duma-v4-dual`
+version-1 tasks; inspect existing run IDs first. No watcher was installed.
+
 All three final-runtime Gemini preflights passed strict offline audits; reports:
 `.cache/kaggle-v4-r013-preflight-results/{solo,dual,communication}-gemini-verified.json`.
 Haiku solo 5484252 also passed strict audit:
