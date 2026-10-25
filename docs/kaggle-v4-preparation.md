@@ -57,7 +57,7 @@ these original artifacts before promoting either model to full evaluation.
 
 Alternative-model tool probes: Qwen Next 80B Instruct 5484248 and Qwen Coder
 480B 5484249 returned HTTP 404; DeepSeek-R1 5484250 explicitly rejects tool
-calling. Last remaining Qwen Next Thinking probe 5484267 is running. No
+calling. Last remaining Qwen Next Thinking probe 5484267 also returned HTTP 404. No
 compatible Chinese replacement has been demonstrated or pinned. Their failure
 must not block private evaluation of supported models or become a scored row.
 Adding an eventual model-specific override requires a new frozen protocol
