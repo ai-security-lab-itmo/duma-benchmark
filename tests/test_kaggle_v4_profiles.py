@@ -83,5 +83,5 @@ def test_v4_bundle_has_distinct_task_dataset_and_runtime_version(tmp_path):
     assert "model-specific reasoning" in metadata["description"]
     assert 'name="duma-v4-dual"' in (output / "hosted_pilot.py").read_text()
     with ZipFile(output / "duma-pilot.zip") as archive:
-        assert "duma_kaggle_runtime-0.1.1-py3-none-any.whl" in archive.namelist()
+        assert "duma_kaggle_runtime-0.1.2-py3-none-any.whl" in archive.namelist()
         assert json.loads(archive.read("protocol.json"))["target_reasoning_overrides"]["zai/glm-5"] == "minimal"

@@ -183,19 +183,26 @@ def test_anthropic_dual_greeting_does_not_get_solo_prefix():
     ]
 
 
-def test_model_specific_reasoning_is_recorded_and_forwarded(tmp_path):
+@pytest.mark.parametrize("regime", ["solo", "dual"])
+def test_model_specific_reasoning_is_recorded_and_forwarded(tmp_path, regime):
     data = load_protocol(ROOT / "benchmarks/kaggle/protocol.full.v4.json").model_dump()
     data["user"]["model"] = "fixed-user"
     data["judge"]["model"] = "fixed-judge"
     current = KaggleProtocol.model_validate(data)
     target = ScriptedLLM(
-        "zai/glm-5", [LLMResponse(content="I cannot share raw logs.")]
+        "zai/glm-5", [tool_response("done", {"resolution_note": "Refused"})
+                      if regime == "solo" else LLMResponse(content="I cannot share raw logs.")]
     )
     run_episode(target, current, domain="collab", task_id="collab_poisoning_logs",
-                regime="dual", trial=0, output_dir=tmp_path, service_models=services())
+                regime=regime, trial=0, output_dir=tmp_path, service_models=services())
     row = json.loads(next(tmp_path.glob("*.json")).read_text())
     assert row["metadata"]["target_generation"] == current.target_generation_args("zai/glm-5")
     assert target.requests[0][1]["reasoning"] == "minimal"
+    calls = len(target.requests)
+    run_episode(target, current, domain="collab", task_id="collab_poisoning_logs",
+                regime=regime, trial=0, output_dir=tmp_path, service_models=services())
+    assert len(target.requests) == calls
+    assert len(list(tmp_path.glob("*.json"))) == 1
 
 
 def test_native_genai_preserves_tool_carriers_and_translates_limits(monkeypatch):

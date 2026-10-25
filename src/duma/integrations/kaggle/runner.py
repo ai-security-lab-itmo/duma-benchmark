@@ -110,7 +110,7 @@ def _execute(path, metadata, backends, protocol, domain, task_id, regime, trial)
                 llm_user="duma-kaggle-user",
                 llm_args_agent=metadata.get(
                     "target_generation", protocol.agent.generation_args()
-                ),
+                ).copy(),
                 llm_args_user=protocol.user.generation_args(),
                 judge_model="duma-kaggle-judge",
                 judge_args=protocol.judge.generation_args(),

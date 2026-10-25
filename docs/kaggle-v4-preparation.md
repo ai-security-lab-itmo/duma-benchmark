@@ -1,6 +1,6 @@
 # Unified V4 Preparation
 
-Date: 2026-10-26. Local preparation complete; no V4 resources uploaded or run.
+Date: 2026-10-26. Private V4 Dataset created; corrected runtime readiness in progress.
 Work remains on `codex/kaggle-benchmarks`; no merge/publication.
 
 ## User Decision And Protocol
@@ -37,6 +37,36 @@ Full five-target evaluation is 1,050 episodes: 35 tasks x 3 repeats x 2 regimes 
 do not schedule the entire matrix blindly or buy paid API capacity.
 
 ## Frozen Candidate
+
+The initial 0.1.1 candidate below is retained for provenance only. Hosted Gemini
+readiness passed (5484134); initial dual/solo/communication diagnostics completed
+(5484156/5484157/5484158). Strict offline audit rejected solo: the agent mutates
+its generation dictionary by adding seed, which also changed saved metadata.
+Do not use these initial diagnostics as certified V4 ranking results.
+
+Runtime 0.1.2 passes a copy of generation arguments into the engine, preserving
+metadata/checkpoint identity. The regression covers both regimes and resume
+without new target calls. Full tests: 293 passed, 16 skipped; focused tests: 42
+passed; Ruff passed. Direct pytest initially failed collection because tests/
+was absent from its import path; python -m pytest passed without source changes.
+
+Corrected candidate (same protocol and byte-identical task data):
+
+- Runtime Python: `b07d80d8664d14b3e87fa0ca8cd90a54ff9360390cd4740e17ab5a905a8d85f8`
+- Bundle SHA-256: `024fe81c8e76d15e15e9f63321e76e275420ac15213c03aef3dfcb3fd31b892e`
+- Staging: `.cache/kaggle-v4-r012-runtime`; extracted: `.cache/kaggle-v4-r012-assets`.
+- Private Dataset version 2 uploaded; corrected readiness task:
+  `duma-v4-r012-runtime-check/1`. Await its completion before corrected preflights.
+- Installed audit environment now contains 0.1.2, not the original 0.1.1 wheel.
+
+Corrected readiness passed. The first r012 preflight wrappers retained the old
+manifest hash and failed closed during bootstrap, before inference. Their
+diagnostics remain untouched; wrapper manifest pins were corrected to
+`7ec6e5da8b6f796fd96883e93a3d7ddd1697f03dac4beee82cb4c3b59f2a9247`.
+Fresh `duma-v4-r012b-preflight-{dual,solo,communication}/1` tasks now validate the
+same 0.1.2 bundle. No integrity checks were bypassed or relaxed.
+
+Original candidate identities:
 
 - Protocol JSON: `benchmarks/kaggle/protocol.full.v4.json`
 - Protocol fingerprint: `cc5dedcad4c423156f17d257129a77c846fb418680f23da7d97e00480e6e7325`
@@ -92,6 +122,13 @@ No proxy token was persisted or printed.
 
 ## Upload Authorization Gate
 
+Resolved: the user explicitly approved the exact V4 private upload and five-model
+quota-funded checks/evaluation. Dataset `ivanblch/duma-bench-private-v4-runtime`
+was created successfully (ID 12853003, version 1, server-confirmed private and
+ready). The private `duma-v4-runtime-check/1` installation-only task was pushed
+with only this Dataset attached; validation is running. No V3 resource changed.
+At scheduling, free quota was USD 9.9682838 daily / 86.41224165 monthly.
+
 The first private V4 Dataset-create command was rejected by the approval reviewer
 before execution: prior explicit upload approval named the V3 destinations,
 not this new V4 destination/payload. No V4 bytes were uploaded. Do not work around
@@ -99,8 +136,8 @@ the rejection by mutating V3 or using a different route.
 
 Requested explicit user approval for code, all 35 tasks/test secrets and the V4
 protocol in `ivanblch/duma-bench-private-v4-runtime`, followed by private checks
-and five-model evaluation using Kaggle quota, without public publication. Wait
-for that approval before retrying creation or any hosted V4 push.
+and five-model evaluation using Kaggle quota, without public publication. That
+approval was subsequently received; the original rejection was not bypassed.
 
 After approval: create private Dataset, verify server metadata, hosted readiness,
 then one-episode dual/solo/judge compatibility and frozen-wheel audit. Only then
