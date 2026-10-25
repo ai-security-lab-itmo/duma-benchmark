@@ -16,9 +16,11 @@ historical V1/V2 measurements as hardened V3 results.
 - Reviewed locally: 1,206 file/archive elements and all four exported notebooks;
   no credential-pattern/known-token or personal-path matches. Author confirmed
   CRM records are fictional. Card includes scenario-address and data warnings.
-- Pending: fresh live attachment/notebook/version inventory (Kaggle requests
-  disconnected during auth), application of the safety notice to the Dataset
-  description, anonymous-access checks after transition and publication approval.
+- Passed: fresh live inventory and full byte comparison of both Dataset versions
+  (39 files each); exact task attachments, completed run IDs and private source
+  notebooks/version 1 confirmed. Earlier connectivity issue is resolved.
+- Pending: application of the safety notice to the Dataset description at the
+  approved transition, anonymous-access checks after transition and publication approval.
 - Not executed: Dataset/task/notebook publication, public collection, branch merge.
 
 Audit checksum: `3e260d93f8dd64ab2087dd899bf5fc37aae7cb9e3504b181fe2e72ab4a87643a`.

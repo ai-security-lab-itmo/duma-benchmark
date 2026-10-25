@@ -94,3 +94,41 @@ description at the later authorized publication step. Keep diagnostic resources
 private. Recheck live attachments, exact versions, notebook identities and
 visibility once Kaggle requests work, then obtain explicit publication approval.
 Anonymous-reader checks can only be completed after the authorized transition.
+
+## Live Server Reconciliation Passed (2026-10-25)
+
+Kaggle access recovered. Fresh authenticated read-only checks and downloads now
+supersede the earlier connectivity limitation:
+
+| Resource | Version | Visibility | Verification |
+|---|---:|---|---|
+| Full runtime Dataset | 2 | Private | Ready; all 39 files match local bytes |
+| Pilot runtime Dataset | 1 | Private | Ready; all 39 files match local bytes |
+| duma-v3-solo | 1 | Private | Exact full Dataset attachment; two expected completed runs |
+| duma-v3-dual | 1 | Private | Exact full Dataset attachment; two expected completed runs |
+| ivanblch/new-benchmark-task-94a61 | 1 | Private | Kernel ID 140654009; source matches solo wrapper |
+| ivanblch/new-benchmark-task-474ee | 1 | Private | Kernel ID 140654027; source matches dual wrapper |
+
+Each Dataset has the 37 expected expanded bundle files plus `bundle-sha256.txt`
+and `hosted_pilot.py`, with no missing or unexpected files. Downloaded both exact
+Dataset versions and compared every decompressed file, not just names/sizes.
+LICENSE, NOTICE, wheel, policies, tasks, prompts and protocol all match reviewed
+assets. Both Datasets retain Other license metadata with explicit MIT terms.
+
+Both source notebooks have exactly the full Dataset attachment and no kernel,
+competition or model data-source attachments. GPU/TPU are disabled; internet is
+enabled for the declared model service use. Task API reports backing notebooks
+unpublished. The four expected full runs remain completed without additional
+attempts. No visibility, attachment, description or code changes were made.
+
+Current source-download hashes (not executed notebook-output hashes above):
+
+- Solo: `619f435ac2d42b2a58be36cfbc9cc68dd32f0dad7427dc08a9ef41591186e215`
+- Dual: `f981d6671e8bda051993a74e339af2be9d76e65da7da7becf722f687bffaaf03`
+
+Machine-readable evidence: `.cache/kaggle-v3-server-reconciliation/report.json`;
+SHA-256 `d8e4a6b1014625598d1f4b69be861fff2c135799b86a2c294d46fb716bdddcca`.
+Private validation, local content review and live reconciliation are complete.
+The remaining actions are the explicitly authorized public transition, including
+applying the prepared safety notice to the Dataset description, and subsequent
+anonymous-reader checks. This report is not permission to execute those actions.

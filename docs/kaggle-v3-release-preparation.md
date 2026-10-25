@@ -340,3 +340,23 @@ Fresh server inventory requests failed twice during token introspection with
 RemoteDisconnected. Local review is complete; current live attachments, exact
 notebook/version identities and visibility remain to be rechecked before release.
 Anonymous-reader checks and explicit publication approval also remain outstanding.
+
+### Live Server Reconciliation Passed (2026-10-25)
+
+Kaggle authentication is working again. Downloaded full Dataset version 2 and
+pilot version 1: exactly 39 expected files each, all decompressed bytes identical
+to the locally reviewed bundles and wrapper/hash files. Both Ready/private with
+Other license metadata and MIT terms. No unexpected attachments or content.
+
+Solo/dual task version 1 remain private and reference only the full Dataset;
+all four expected run IDs remain completed, with no new attempts. Resolved and
+downloaded both backing notebooks: `ivanblch/new-benchmark-task-94a61` (140654009)
+and `ivanblch/new-benchmark-task-474ee` (140654027), both version 1/private and
+unpublished. Sources match frozen solo/dual wrappers. Their only data source is
+the full Dataset; no kernel/competition/model data-source attachments.
+
+Reconciliation report: `.cache/kaggle-v3-server-reconciliation/report.json`;
+SHA-256 `d8e4a6b1014625598d1f4b69be861fff2c135799b86a2c294d46fb716bdddcca`.
+Details added to the privacy review and publication checklist. All private
+validation/content/live-inventory gates are complete; public transition and
+anonymous-reader checks remain separate. No uploads or visibility changes.

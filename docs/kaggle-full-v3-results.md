@@ -125,7 +125,8 @@ The opposite regime trends across targets do not support a universal directional
 claim. This version measures the combined regime-level conditions, not isolated
 causal factors. No post-result retuning or score changes were made.
 
-Private validation is complete. Public transition still requires review of exact
-Dataset versions, notebook contents, credential/privacy exposure, descriptions
-and anonymous-access links, followed by explicit publication approval. Do not
-publish pilot/readiness resources or merge the runtime branch automatically.
+Private validation, local privacy review and live Dataset/notebook reconciliation
+are complete; see `docs/kaggle-v3-privacy-review.md`. Public transition still
+requires explicit approval, application of the prepared Dataset safety notice,
+and subsequent anonymous-access checks. Do not publish pilot/readiness resources
+or merge the runtime branch automatically.

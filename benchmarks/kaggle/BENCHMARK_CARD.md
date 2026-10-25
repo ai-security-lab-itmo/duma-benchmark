@@ -1,7 +1,8 @@
 # DUMA-Bench: Interactive Agent Security (Hardened V3)
 
-PRIVATE RELEASE DRAFT. V3 pilot and full artifact audits passed. Public asset
-review and publication approval remain required. No V1/V2 scores are V3 measurements.
+PRIVATE RELEASE DRAFT. V3 pilot/full audits, local content review and live server
+reconciliation passed. Publication approval remains required; apply the safety
+notice to the Dataset description during that transition. No V1/V2 scores are V3 measurements.
 
 ## Overview
 
