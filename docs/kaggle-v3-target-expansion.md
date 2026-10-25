@@ -108,3 +108,12 @@ and new matrices will be compared; do not silently substitute the new source
 into full-v3 or claim a five-model common-protocol audit. Existing 420-row V3
 measurements remain valid for their original frozen bundle and are untouched.
 The user decision on the Chinese-target reasoning incompatibility is outstanding.
+
+## Superseding Unified V4 Decision
+
+The user subsequently approved minimal for Qwen/GLM and then requested one profile
+for display/comparison. Unified V4 now pins exact model-specific reasoning settings
+instead of separate profile leaderboards; minimal is not assumed universally
+equivalent to disabled reasoning. V3 remains frozen. Local implementation/tests,
+candidate identities and the pending new-Dataset upload approval are documented
+in `docs/kaggle-v4-preparation.md`. No new target has a full validated matrix yet.

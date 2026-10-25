@@ -3,12 +3,13 @@
 Work stays on `codex/kaggle-benchmarks`; see the [migration plan](../../docs/kaggle-migration-plan.md).
 Private validation does not imply publication or merging.
 
-**Unreleased target-expansion change:** the current branch includes an undeployed
-Anthropic system-only solo transport fix. Existing audited V3 results use the
-frozen bundle, not a rebuild from this new HEAD. Version the next runtime/protocol
-before deployment. Haiku/Chinese compatibility findings and pending decisions:
-[target expansion](../../docs/kaggle-v3-target-expansion.md). No additional full
-model matrices have been launched yet.
+**Prepared unified V4:** runtime 0.1.1 includes the Anthropic solo transport fix
+and explicit model-specific target reasoning (minimal for Qwen/GLM, none by
+default). Effective settings are retained and audited; minimal is not universally
+equated with disabled reasoning. See [V4 preparation](../../docs/kaggle-v4-preparation.md).
+Upload to the new private V4 Dataset requires the requested explicit approval;
+no V4 resources or full matrices have launched. Existing V3 results use their
+frozen bundle, not a rebuild from this HEAD. Never relabel V3 checkpoints as V4.
 
 ## Hardened revision (2026-10-24)
 

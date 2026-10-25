@@ -45,6 +45,10 @@ def wheel_identity(bundle):
 
 def verify_episode(item, protocol, source, data, sdk="0.6.2"):
     meta = item["metadata"]
+    if getattr(protocol, "target_reasoning_overrides", None) is not None and meta.get(
+        "target_generation"
+    ) != protocol.target_generation_args(meta["target_model"]):
+        raise ValueError("Effective target generation differs from protocol")
     if (
         meta["protocol"] != protocol.model_dump()
         or meta["protocol_hash"] != protocol.fingerprint

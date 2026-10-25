@@ -71,6 +71,8 @@ def run_episode(
         "trial": trial,
         "seed": protocol.trial_seeds[trial],
     }
+    if protocol.target_reasoning_overrides is not None:
+        metadata["target_generation"] = protocol.target_generation_args(target_id)
     # Model names can contain slashes; never use them directly as path components.
     from hashlib import sha256
 
@@ -106,7 +108,9 @@ def _execute(path, metadata, backends, protocol, domain, task_id, regime, trial)
                 user="dummy_user" if regime == "solo" else "user_simulator",
                 llm_agent="duma-kaggle-target",
                 llm_user="duma-kaggle-user",
-                llm_args_agent=protocol.agent.generation_args(),
+                llm_args_agent=metadata.get(
+                    "target_generation", protocol.agent.generation_args()
+                ),
                 llm_args_user=protocol.user.generation_args(),
                 judge_model="duma-kaggle-judge",
                 judge_args=protocol.judge.generation_args(),

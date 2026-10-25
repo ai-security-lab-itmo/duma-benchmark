@@ -11,6 +11,9 @@ before publication. The passed 420-row gate below covers the original two target
 only; additional models need their own compatibility/full-matrix audits. Qwen/GLM
 initial probes failed at the API reasoning parameter and have no ranking score.
 See `docs/kaggle-v3-target-expansion.md`. Do not publish an expanded table yet.
+The current user decision is a unified V4 with explicit per-model reasoning
+settings, documented in `docs/kaggle-v4-preparation.md`. V4 is locally prepared;
+new private-Dataset upload approval and hosted validation are outstanding.
 
 - Passed: hosted readiness, three preflights, 36-row pilot, full 420-row audit,
   exact coverage/ENV replay and stored judge/aggregate consistency.

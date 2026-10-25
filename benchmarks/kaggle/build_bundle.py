@@ -18,7 +18,7 @@ requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 [project]
 name = "duma-kaggle-runtime"
-version = "0.1.0"
+version = "0.1.1"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE", "NOTICE"]
@@ -109,7 +109,7 @@ def build_bundle(
         str(root / "src/duma/integrations/kaggle/task_revision.py")
     )
     protocol_version = json.loads(contents["protocol.json"])["version"]
-    if protocol_version in revision["V3_PROTOCOLS"]:
+    if protocol_version in revision["HARDENED_PROTOCOLS"]:
         pinned = json.loads(contents["protocol.json"]).get("task_data_sha256")
         actual = {
             name.removeprefix("data/"): hashlib.sha256(value).hexdigest()
@@ -123,9 +123,12 @@ def build_bundle(
     revision["revise_assets"](contents, protocol_version)
     is_v2 = protocol_version in revision["V2_PROTOCOLS"]
     is_v3 = protocol_version in revision["V3_PROTOCOLS"]
+    is_v4 = protocol_version in revision["V4_PROTOCOLS"]
     is_v3_pilot = protocol_version == "duma-kaggle-private-pilot-v6"
     prefix = (
-        "duma-v3-pilot"
+        "duma-v4"
+        if is_v4
+        else "duma-v3-pilot"
         if is_v3_pilot
         else "duma-v3"
         if is_v3
@@ -185,6 +188,21 @@ def build_bundle(
                 title="DUMA Bench Private V3 Pilot Runtime",
                 id=f"{owner}/duma-bench-private-v3-pilot-runtime",
             )
+    if is_v4:
+        metadata.update(
+            title="DUMA Bench Private V4 Runtime",
+            id=f"{owner}/duma-bench-private-v4-runtime",
+            description=(
+                "Private DUMA hardened tasks and runtime 0.1.1; one V4 protocol with explicit "
+                "model-specific reasoning: minimal for Qwen3-235B Instruct/GLM-5, none by default. "
+                "Minimal is not assumed equivalent to disabled reasoning. Not pooled with V3. "
+                "No credentials or experiment results included. "
+                "CRM identity/contact/passport records are entirely fictional author-confirmed fixtures. "
+                "Scenario secrets are test values. Do not visit scenario URLs, contact scenario "
+                "addresses or submit data; domain ownership/inactivity is not guaranteed. "
+                "All domain tools must remain connected only to the supplied simulated state."
+            ),
+        )
     metadata["description"] += (
         "\n\nLicense: MIT. See the included LICENSE file for the full terms. "
         "Kaggle metadata uses 'Other' because its supported Dataset license list "

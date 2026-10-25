@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 
 class ModelSettings(BaseModel):
@@ -14,7 +14,7 @@ class ModelSettings(BaseModel):
     model: str | None = Field(default=None, min_length=1)
     temperature: float = Field(default=0.0, ge=0, le=2)
     max_tokens: int = Field(default=2048, gt=0)
-    reasoning: Literal["none", "low", "medium", "high"] | None = None
+    reasoning: Literal["none", "minimal", "low", "medium", "high"] | None = None
 
     def generation_args(self) -> dict:
         return self.model_dump(exclude={"model"}, exclude_none=True)
@@ -33,6 +33,16 @@ class KaggleProtocol(BaseModel):
     max_errors: int = Field(default=10, gt=0)
     tasks: dict[str, list[str]]
     task_data_sha256: dict[str, str] | None = None
+    target_reasoning_overrides: dict[
+        str, Literal["none", "minimal", "low", "medium", "high"]
+    ] | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_protocol(self, handler):
+        data = handler(self)
+        if self.target_reasoning_overrides is None:
+            data.pop("target_reasoning_overrides")
+        return data
 
     @model_validator(mode="after")
     def validate_manifest(self):
@@ -49,7 +59,23 @@ class KaggleProtocol(BaseModel):
                 raise ValueError(f"Expected nonempty, unique task IDs for {domain}")
         if self.agent.model is not None:
             raise ValueError("The target model must be selected by Kaggle")
+        if self.version == "duma-kaggle-private-full-v4":
+            if self.agent.reasoning != "none" or self.target_reasoning_overrides is None:
+                raise ValueError("V4 requires explicit target reasoning overrides and default none")
+        elif self.target_reasoning_overrides is not None:
+            raise ValueError("Target reasoning overrides require the V4 protocol")
+        if self.target_reasoning_overrides and any(
+            "/" not in model or model.strip() != model
+            for model in self.target_reasoning_overrides
+        ):
+            raise ValueError("Target reasoning overrides require canonical provider/model identities")
         return self
+
+    def target_generation_args(self, model: str) -> dict:
+        args = self.agent.generation_args()
+        if self.target_reasoning_overrides and model in self.target_reasoning_overrides:
+            args["reasoning"] = self.target_reasoning_overrides[model]
+        return args
 
     def require_service_models(self) -> None:
         if not self.user.model or not self.judge.model:
@@ -58,13 +84,10 @@ class KaggleProtocol(BaseModel):
             raise ValueError("Select separate user and judge models for this protocol")
 
     def validate_data(self, data_dir: Path) -> None:
-        from duma.integrations.kaggle.task_revision import validate_revision
+        from duma.integrations.kaggle.task_revision import HARDENED_PROTOCOLS, validate_revision
 
         validate_revision(self.version, data_dir)
-        if self.version in {
-            "duma-kaggle-private-full-v3",
-            "duma-kaggle-private-pilot-v6",
-        }:
+        if self.version in HARDENED_PROTOCOLS:
             if not self.task_data_sha256:
                 raise ValueError("Hardened protocol requires pinned task data hashes")
             actual = {

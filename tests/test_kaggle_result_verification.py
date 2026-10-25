@@ -103,6 +103,14 @@ def test_aggregate_roundoff_tolerance_does_not_change_counts_or_unknown_cost():
     assert not equal(float("nan"), float("nan"))
 
 
+def test_audit_rejects_mislabeled_model_specific_generation():
+    protocol = load_protocol(ROOT / "benchmarks/kaggle/protocol.full.v4.json")
+    with pytest.raises(ValueError, match="Effective target generation"):
+        verify_episode({"metadata": {
+            "target_model": "zai/glm-5", "target_generation": {"reasoning": "none"}
+        }}, protocol, "source", "data")
+
+
 @pytest.fixture(scope="module")
 def examples():
     protocol = load_protocol(ROOT / "benchmarks/kaggle/protocol.full.v3.json")

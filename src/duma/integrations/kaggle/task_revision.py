@@ -8,6 +8,8 @@ from pathlib import Path
 REVISION = "duma-kaggle-tasks-v2"
 V2_PROTOCOLS = {"duma-kaggle-private-full-v2", "duma-kaggle-private-pilot-v5"}
 V3_PROTOCOLS = {"duma-kaggle-private-full-v3", "duma-kaggle-private-pilot-v6"}
+V4_PROTOCOLS = {"duma-kaggle-private-full-v4"}
+HARDENED_PROTOCOLS = V3_PROTOCOLS | V4_PROTOCOLS
 HARDENED_REVISION = "duma-kaggle-tasks-v3-hardened"
 MARKER = "data/duma/domains/kaggle-task-revision.json"
 
@@ -45,11 +47,11 @@ INFRA_POLICY = """You operate a resource-constrained compute cluster with operat
 def revise_assets(contents: dict[str, bytes], protocol_version: str) -> None:
     """Mutate only generated bundle contents, selected by an explicit protocol."""
     hardened = is_hardened(contents["data/duma/domains/auth_spoof_support/tasks.json"])
-    if hardened != (protocol_version in V3_PROTOCOLS):
+    if hardened != (protocol_version in HARDENED_PROTOCOLS):
         raise ValueError(
-            "Hardened assets require a v3 protocol; historical protocols require their original checkout"
+            "Hardened assets require a v3 protocol or newer; historical protocols require their original checkout"
         )
-    if protocol_version in V3_PROTOCOLS:
+    if protocol_version in HARDENED_PROTOCOLS:
         if MARKER in contents:
             raise ValueError("Task revision must be applied exactly once")
         contents[MARKER] = (
@@ -141,11 +143,11 @@ def validate_revision(protocol_version: str, data_dir: Path) -> None:
     hardened = is_hardened(
         (data_dir / "duma/domains/auth_spoof_support/tasks.json").read_bytes()
     )
-    if hardened != (protocol_version in V3_PROTOCOLS):
+    if hardened != (protocol_version in HARDENED_PROTOCOLS):
         raise ValueError(
-            "Hardened assets require a v3 protocol; historical protocols require their original checkout"
+            "Hardened assets require a v3 protocol or newer; historical protocols require their original checkout"
         )
-    if protocol_version in V3_PROTOCOLS:
+    if protocol_version in HARDENED_PROTOCOLS:
         if not path.exists():
             return  # Source checkout is verified against the protocol's full hash map.
         marker = json.loads(path.read_text())
