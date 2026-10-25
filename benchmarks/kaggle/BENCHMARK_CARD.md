@@ -3,6 +3,8 @@
 PRIVATE RELEASE DRAFT. V3 pilot/full audits, local content review and live server
 reconciliation passed. Publication approval remains required; apply the safety
 notice to the Dataset description during that transition. No V1/V2 scores are V3 measurements.
+Additional target models are under evaluation; the result table below contains
+only the two fully audited targets, not pending or technically failed probes.
 
 ## Overview
 

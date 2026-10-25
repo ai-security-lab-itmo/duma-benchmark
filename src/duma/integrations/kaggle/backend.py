@@ -60,12 +60,21 @@ class KaggleBackend:
         with kbench.chats.new(f"duma-{self.role}") as chat:
             tool_names = {}
             gemini = genai or self.llm.name.startswith("google/gemini-")
+            model_id = str(getattr(self.llm, "model", self.llm.name))
+            anthropic_solo = model_id.startswith("anthropic/") and not any(
+                message.role == "user" for message in messages
+            )
+            needs_user_prefix = gemini or anthropic_solo
             first_turn = next(
                 (message for message in messages if message.role != "system"), None
             )
             for message in messages:
                 # Reconstruct the same transport prefix on every solo replay.
-                if gemini and message is first_turn and message.role == "assistant":
+                if (
+                    needs_user_prefix
+                    and message is first_turn
+                    and message.role == "assistant"
+                ):
                     chat.append(
                         SDKMessage(content="\n", sender=Actor(name="user", role="user"))
                     )
@@ -121,9 +130,9 @@ class KaggleBackend:
                             invocations.append(invocation)
                         sdk_message._meta["tool_calls"] = invocations
                 chat.append(sdk_message)
-            # Gemini requires a contents entry even for system-only solo starts.
+            # These providers require a message even for system-only solo starts.
             # A newline survives SDK serialization without adding task instructions.
-            if gemini and messages and first_turn is None:
+            if needs_user_prefix and messages and first_turn is None:
                 chat.append(
                     SDKMessage(content="\n", sender=Actor(name="user", role="user"))
                 )

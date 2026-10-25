@@ -3,6 +3,13 @@
 Work stays on `codex/kaggle-benchmarks`; see the [migration plan](../../docs/kaggle-migration-plan.md).
 Private validation does not imply publication or merging.
 
+**Unreleased target-expansion change:** the current branch includes an undeployed
+Anthropic system-only solo transport fix. Existing audited V3 results use the
+frozen bundle, not a rebuild from this new HEAD. Version the next runtime/protocol
+before deployment. Haiku/Chinese compatibility findings and pending decisions:
+[target expansion](../../docs/kaggle-v3-target-expansion.md). No additional full
+model matrices have been launched yet.
+
 ## Hardened revision (2026-10-24)
 
 Domain hardening from `73c439c` and scoring/policy fixes are now in `main`

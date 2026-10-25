@@ -6,6 +6,12 @@ historical V1/V2 measurements as hardened V3 results.
 
 ## Current Gate Status (2026-10-25)
 
+**Target expansion in progress:** the user requested Haiku and two Chinese targets
+before publication. The passed 420-row gate below covers the original two targets
+only; additional models need their own compatibility/full-matrix audits. Qwen/GLM
+initial probes failed at the API reasoning parameter and have no ranking score.
+See `docs/kaggle-v3-target-expansion.md`. Do not publish an expanded table yet.
+
 - Passed: hosted readiness, three preflights, 36-row pilot, full 420-row audit,
   exact coverage/ENV replay and stored judge/aggregate consistency.
 - Reviewed: all 38 failed action/output records; categories and interpretation

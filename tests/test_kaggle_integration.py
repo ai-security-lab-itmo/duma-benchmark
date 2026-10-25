@@ -122,8 +122,9 @@ def test_histories_do_not_leak_between_service_roles():
     assert [m.content for m in llm.requests[1][0]] == ["private persona"]
 
 
-def test_gemini_system_only_start_has_empty_transport_turn():
-    llm = ScriptedLLM("google/gemini-test", [LLMResponse(content="ready")])
+@pytest.mark.parametrize("model", ["google/gemini-test", "anthropic/claude-haiku-test"])
+def test_system_only_start_has_stable_empty_transport_turn(model):
+    llm = ScriptedLLM(model, [LLMResponse(content="ready")])
     history = [SystemMessage(role="system", content="Unchanged solo task")]
     KaggleBackend(llm, "target")(messages=history)
     wire = list(OpenAICompletionSerializer().dump_messages(llm.requests[0][0]))
@@ -137,7 +138,7 @@ def test_gemini_system_only_start_has_empty_transport_turn():
         content=None,
         tool_calls=[ToolCall(id="call-1", name="get_collab_note", arguments={})],
     )
-    replay = ScriptedLLM("google/gemini-test", [LLMResponse(content="ready")])
+    replay = ScriptedLLM(model, [LLMResponse(content="ready")])
     KaggleBackend(replay, "target")(
         messages=history
         + [first, ToolMessage(role="tool", id="call-1", content="note")]
@@ -154,14 +155,32 @@ def test_gemini_system_only_start_has_empty_transport_turn():
     ]
 
 
-def test_gemini_normal_history_has_no_extra_transport_turn():
-    llm = ScriptedLLM("google/gemini-test", [LLMResponse(content="ready")])
+@pytest.mark.parametrize(
+    "model", ["google/gemini-test", "anthropic/claude-haiku-test", "openai/test"]
+)
+def test_normal_history_has_no_extra_transport_turn(model):
+    llm = ScriptedLLM(model, [LLMResponse(content="ready")])
     history = [
         SystemMessage(role="system", content="Policy"),
         UserMessage(role="user", content="Request"),
     ]
     KaggleBackend(llm, "target")(messages=history)
     assert [message.content for message in llm.requests[0][0]] == ["Policy", "Request"]
+
+
+def test_anthropic_dual_greeting_does_not_get_solo_prefix():
+    llm = ScriptedLLM("anthropic/claude-haiku-test", [LLMResponse(content="ready")])
+    history = [
+        SystemMessage(role="system", content="Policy"),
+        AssistantMessage(role="assistant", content="Hello"),
+        UserMessage(role="user", content="Request"),
+    ]
+    KaggleBackend(llm, "target")(messages=history)
+    assert [message.content for message in llm.requests[0][0]] == [
+        "Policy",
+        "Hello",
+        "Request",
+    ]
 
 
 def test_native_genai_preserves_tool_carriers_and_translates_limits(monkeypatch):
