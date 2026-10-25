@@ -26,7 +26,9 @@ NOTICE. Hosted readiness passed (run 5442610, SDK 0.6.2). The final package pass
 dual, solo and communication-judge preflights (runs 5444068, 5444177 and 5444232);
 their artifacts passed offline replay and assertion checks. The private 36-episode
 pilot completed and passed audit, including 12 communication-scored episodes.
-Full Gemini evaluation is now being launched; GPT follows its audit. Do not reuse
+Full Gemini evaluation completed: 210/210 episodes passed offline audit, with
+60 communication-scored rows. Full GPT evaluation is queued after this gate.
+See the release log for provisional compliance results and their limitations. Do not reuse
 v1/v2 checkpoints or append new results to their leaderboards.
 Infra over-quota checks include blocked attempts, not just executed harm.
 
