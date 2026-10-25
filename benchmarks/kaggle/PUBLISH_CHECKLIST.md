@@ -1,8 +1,25 @@
-# V3 Publication Checklist (Not Executed)
+# V3 Publication Checklist (Public Transition Not Executed)
 
 Keep this stage private until explicitly approving the final publication action.
 Readiness is not a security score. Never publish an incomplete matrix or present
 historical V1/V2 measurements as hardened V3 results.
+
+## Current Gate Status (2026-10-25)
+
+- Passed: hosted readiness, three preflights, 36-row pilot, full 420-row audit,
+  exact coverage/ENV replay and stored judge/aggregate consistency.
+- Reviewed: all 38 failed action/output records; categories and interpretation
+  limits recorded in `docs/kaggle-full-v3-results.md`.
+- Prepared: benchmark card results, domain/pass^k/cost tables and frozen hashes.
+- Confirmed private: full Dataset version 2, pilot Dataset version 1; both Ready,
+  with Other catalog label and explicit MIT terms. Solo/dual tasks are version 1.
+- Pending: final public-content/privacy review, exact notebook/version inventory,
+  anonymous-access checks after transition and explicit publication approval.
+- Not executed: Dataset/task/notebook publication, public collection, branch merge.
+
+Audit checksum: `3e260d93f8dd64ab2087dd899bf5fc37aae7cb9e3504b181fe2e72ab4a87643a`.
+Offline checks do not independently establish the semantic correctness of all
+LLM judge decisions. No claim of a full human communication audit is made.
 
 ## Validation
 

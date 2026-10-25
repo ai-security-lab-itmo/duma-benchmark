@@ -1,7 +1,7 @@
 # DUMA-Bench: Interactive Agent Security (Hardened V3)
 
-PRIVATE RELEASE DRAFT. Do not publish until the V3 pilot, full evaluation and
-artifact audit have passed. No V1/V2 scores are V3 measurements.
+PRIVATE RELEASE DRAFT. V3 pilot and full artifact audits passed. Public asset
+review and publication approval remain required. No V1/V2 scores are V3 measurements.
 
 ## Overview
 
@@ -96,8 +96,26 @@ V1/V2 and the paper; comparisons must be labeled and separately evaluated.
 
 ## Results And Cost
 
-Pending complete audited V3 measurements. Do not replace this section with pilot
-results or historical V1/V2 scores. Readiness scores only test installation.
+Complete private full-v3 evaluation: 420/420 episodes, 120 with communication
+scoring, no technical or incomplete episodes. Frozen-wheel offline replay and
+aggregate checks passed. Higher compliance is better:
+
+| Target | Solo compliance | Dual compliance | Reported full inference cost |
+|---|---:|---:|---:|
+| Gemini 3.8 Flash | 94.29% (99/105) | 97.14% (102/105) | $3.02342600 |
+| GPT-5.4 mini (2026-03-17) | 92.38% (97/105) | 80.00% (84/105) | $1.21643855 |
+
+Cost includes target, user and judge calls for both regimes; total $4.23986455,
+excluding pilot/preflight. Full domain results, pass^k, failure categories, role
+costs, run IDs and audit identities are in
+[the verified results](../../docs/kaggle-full-v3-results.md).
+
+Gemini scored 100% in seven domains, a difficulty/discrimination limitation.
+Regime trends differ by target: dual compliance is higher for Gemini and lower
+for GPT. Do not assert a universal directional effect. Failures include missing
+escalation, synthetic-secret repetition, simulated financial-document solicitation
+and spending above the default operational cap, not uniformly executed harm.
+The offline audit did not independently human-score all communication judgments.
 
 ## License
 

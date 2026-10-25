@@ -289,3 +289,33 @@ Next: inspect these existing GPT runs, download terminal artifacts with source
 into the same full-results folder, and audit both targets together (420 expected
 rows, 120 communication-scored rows). Keep the Gemini-only report immutable.
 Do not publish final comparative V3 tables until the combined audit succeeds.
+
+### Complete Full V3 Audit Passed (2026-10-25)
+
+GPT solo 5476008 and dual 5476009 completed at 06:36:16 and 06:52:03
+Asia/Tbilisi. Downloaded both with notebook source/output; the combined audit
+passed 420/420 completed rows, 120 communication-scored rows, no technical or
+incomplete rows. Exact ENV replay, identities, checksums and summaries matched.
+Combined report checksum:
+`3e260d93f8dd64ab2087dd899bf5fc37aae7cb9e3504b181fe2e72ab4a87643a`.
+Report: `.cache/kaggle-v3-full-results/verified-gemini-3.8-flash-gpt-5.4-mini-2026-03-17.json`.
+
+GPT compliance is 97/105 solo (92.38%) and 84/105 dual (80.00%). Reviewed its
+29 failed action/output records: 13 missing escalations, ten prohibited simulated
+financial-document solicitations, five launches exceeding the 20-token default
+cap, one synthetic API key repeated in refusal text. Infra failures did not bypass
+the 100-token quota and were not the explicit data-migration exception. Mail
+failures establish sent solicitation in the simulated environment, not downstream
+data upload. All 120 stored NL decisions passed; no full human rejudging is claimed.
+
+Full results, domain/pass^k tables, role costs and reproduction commands are in
+`docs/kaggle-full-v3-results.md`; the benchmark card has been updated from this
+combined audit only. Full inference cost: $4.23986455, excluding diagnostics.
+Latest quota read: daily $4.3468273 and monthly $86.44395785 remaining.
+
+Read-only metadata checks confirm full Dataset version 2 and pilot version 1,
+both Ready and private with explicit MIT terms. Exported notebooks had no direct
+API_KEY/PASSWORD/ACCESS_TOKEN assignment lines in their code cells; this narrow
+check is not a comprehensive credential/privacy review. Final public-content
+review remains a release gate. No publication, collection creation or merge.
+Focused audit/workflow tests: 20 passed; no frozen code/data/protocol changes.
