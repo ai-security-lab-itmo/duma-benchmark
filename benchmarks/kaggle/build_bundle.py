@@ -18,7 +18,7 @@ requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 [project]
 name = "duma-kaggle-runtime"
-version = "0.1.2"
+version = "0.1.3"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE", "NOTICE"]
@@ -193,7 +193,7 @@ def build_bundle(
             title="DUMA Bench Private V4 Runtime",
             id=f"{owner}/duma-bench-private-v4-runtime",
             description=(
-                "Private DUMA hardened tasks and runtime 0.1.2; one V4 protocol with explicit "
+                "Private DUMA hardened tasks and runtime 0.1.3; one V4 protocol with explicit "
                 "model-specific reasoning: minimal for Qwen3-235B Instruct/GLM-5, none by default. "
                 "Minimal is not assumed equivalent to disabled reasoning. Not pooled with V3. "
                 "No credentials or experiment results included. "

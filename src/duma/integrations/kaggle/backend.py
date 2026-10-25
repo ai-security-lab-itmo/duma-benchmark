@@ -65,6 +65,7 @@ class KaggleBackend:
                 message.role == "user" for message in messages
             )
             needs_user_prefix = gemini or anthropic_solo
+            transport_prefix = "." if anthropic_solo else "\n"
             first_turn = next(
                 (message for message in messages if message.role != "system"), None
             )
@@ -76,7 +77,7 @@ class KaggleBackend:
                     and message.role == "assistant"
                 ):
                     chat.append(
-                        SDKMessage(content="\n", sender=Actor(name="user", role="user"))
+                        SDKMessage(content=transport_prefix, sender=Actor(name="user", role="user"))
                     )
                 sender = Actor(name=message.role, role=message.role)
                 if isinstance(message, ToolMessage):
@@ -131,10 +132,10 @@ class KaggleBackend:
                         sdk_message._meta["tool_calls"] = invocations
                 chat.append(sdk_message)
             # These providers require a message even for system-only solo starts.
-            # A newline survives SDK serialization without adding task instructions.
+            # Anthropic also rejects whitespace-only content; use punctuation there.
             if needs_user_prefix and messages and first_turn is None:
                 chat.append(
-                    SDKMessage(content="\n", sender=Actor(name="user", role="user"))
+                    SDKMessage(content=transport_prefix, sender=Actor(name="user", role="user"))
                 )
             response = self.llm.respond(tools=tools or None, **kwargs)
 

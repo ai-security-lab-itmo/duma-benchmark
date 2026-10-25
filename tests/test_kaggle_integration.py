@@ -123,14 +123,14 @@ def test_histories_do_not_leak_between_service_roles():
 
 
 @pytest.mark.parametrize("model", ["google/gemini-test", "anthropic/claude-haiku-test"])
-def test_system_only_start_has_stable_empty_transport_turn(model):
+def test_system_only_start_has_stable_transport_turn(model):
     llm = ScriptedLLM(model, [LLMResponse(content="ready")])
     history = [SystemMessage(role="system", content="Unchanged solo task")]
     KaggleBackend(llm, "target")(messages=history)
     wire = list(OpenAICompletionSerializer().dump_messages(llm.requests[0][0]))
     assert wire == [
         {"role": "system", "content": "Unchanged solo task"},
-        {"role": "user", "content": "\n"},
+        {"role": "user", "content": "." if model.startswith("anthropic/") else "\n"},
     ]
     assert len(history) == 1
     first = AssistantMessage(
