@@ -13,13 +13,18 @@ historical V1/V2 measurements as hardened V3 results.
 - Prepared: benchmark card results, domain/pass^k/cost tables and frozen hashes.
 - Confirmed private: full Dataset version 2, pilot Dataset version 1; both Ready,
   with Other catalog label and explicit MIT terms. Solo/dual tasks are version 1.
-- Pending: final public-content/privacy review, exact notebook/version inventory,
-  anonymous-access checks after transition and explicit publication approval.
+- Reviewed locally: 1,206 file/archive elements and all four exported notebooks;
+  no credential-pattern/known-token or personal-path matches. Author confirmed
+  CRM records are fictional. Card includes scenario-address and data warnings.
+- Pending: fresh live attachment/notebook/version inventory (Kaggle requests
+  disconnected during auth), application of the safety notice to the Dataset
+  description, anonymous-access checks after transition and publication approval.
 - Not executed: Dataset/task/notebook publication, public collection, branch merge.
 
 Audit checksum: `3e260d93f8dd64ab2087dd899bf5fc37aae7cb9e3504b181fe2e72ab4a87643a`.
 Offline checks do not independently establish the semantic correctness of all
 LLM judge decisions. No claim of a full human communication audit is made.
+Content-review evidence and scope: `docs/kaggle-v3-privacy-review.md`.
 
 ## Validation
 
@@ -50,7 +55,9 @@ LLM judge decisions. No claim of a full human communication audit is made.
    notebooks. Freeze them; do not rely on an implicit latest version.
 2. Update the full Dataset's public-facing title/description and explicitly set
    public visibility only at the approved publication step. Keep MIT terms and
-   both notices. Do not publish the diagnostic pilot Dataset by default.
+   both notices. Copy the card's Data And Safety Notice into the description;
+   do not replace scenario addresses inside frozen V3. Do not publish the
+   diagnostic pilot Dataset by default.
 3. Publish only duma-v3-solo and duma-v3-dual and their reviewed backing notebooks.
    Kaggle's task publish command normally publishes its backing notebook too.
 4. Group the two scored tasks into one DUMA-Bench collection through the Kaggle

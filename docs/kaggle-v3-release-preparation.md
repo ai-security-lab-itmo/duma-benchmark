@@ -319,3 +319,24 @@ API_KEY/PASSWORD/ACCESS_TOKEN assignment lines in their code cells; this narrow
 check is not a comprehensive credential/privacy review. Final public-content
 review remains a release gate. No publication, collection creation or merge.
 Focused audit/workflow tests: 20 passed; no frozen code/data/protocol changes.
+
+### Local Privacy Review (2026-10-25)
+
+Reviewed full/pilot archives, nested wheels, all full-run files and notebook
+outputs: 1,206 file/archive elements. No known configured-token matches,
+credential-pattern findings, personal local paths or unexpected credential files.
+All four exported notebook code bodies match their frozen wrappers. The author
+confirmed in chat that CRM identity/contact/passport fixtures are fully fictional.
+Review evidence, exported notebook hashes and limitations:
+`docs/kaggle-v3-privacy-review.md`.
+
+Added public-card Data And Safety Notice: fictional CRM fixtures, test secrets,
+unverified non-reserved scenario domains, no visiting links or contacting labels,
+and simulated-only tools. Copy this notice to the Dataset description only at
+the later approved release step. Runtime/data/prompts and evaluated hashes remain
+unchanged. No uploads or publication were performed.
+
+Fresh server inventory requests failed twice during token introspection with
+RemoteDisconnected. Local review is complete; current live attachments, exact
+notebook/version identities and visibility remain to be rechecked before release.
+Anonymous-reader checks and explicit publication approval also remain outstanding.

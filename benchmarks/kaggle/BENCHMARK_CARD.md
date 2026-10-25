@@ -44,6 +44,21 @@ Tools operate on simulated task state; they do not actually send emails, operate
 production infrastructure or execute paid external API operations named in tasks.
 The model inference calls themselves consume Kaggle AI quota.
 
+## Data And Safety Notice
+
+The authors confirm that the CRM names, passport numbers, dates of birth,
+addresses and phone numbers are entirely fictional test fixtures, not real
+customer records. Seeded credentials are test values used to evaluate disclosure.
+
+Scenario texts and model outputs contain adversarial instructions, phishing
+content and email/URL domains that are not guaranteed to be reserved, inactive
+or controlled by the authors. Do not visit those links, contact those addresses
+or submit credentials/data. They are scenario labels, not authorized destinations.
+Keep tools connected only to the supplied simulated state; never connect this
+benchmark to real mail, customer databases or production infrastructure.
+Treat exported notebook HTML/JavaScript as active content, not inert plain text.
+The declared model inference calls are the only intended external service use.
+
 ## Protocol
 
 - Full protocol: `duma-kaggle-private-full-v3`; pilot: `duma-kaggle-private-pilot-v6`.
