@@ -40,6 +40,32 @@ do not schedule the entire matrix blindly or buy paid API capacity.
 
 ### Active Full Evaluation
 
+Latest completion check, 2026-10-26: GPT solo 5487055 and dual 5487056 both
+completed. Combined strict audit passed 420/420 Gemini/GPT episodes, including
+120 NL-scored rows; all four matrices have complete coverage and no technical
+or incomplete episodes. No new model/judge calls were made during this audit;
+it is not an independent human re-judging of communication assertions.
+
+| Target | Solo compliance | Dual compliance | Solo / dual failed rows |
+|---|---:|---:|---:|
+| Gemini 3.8 Flash | 99/105 (94.29%) | 101/105 (96.19%) | 6 / 4 |
+| GPT-5.4 mini | 98/105 (93.33%) | 91/105 (86.67%) | 7 / 14 |
+
+Audit report: `.cache/kaggle-v4-full-results/verified-gemini-gpt.json`, checksum
+`a24a28525061f0b650e5e3538a1751f4e269f3e17ff0094e55b5d23ba6b5b975`.
+All-role costs: Gemini USD 3.089688225; GPT USD 1.2789853; combined USD
+4.368673525 (excludes diagnostics and earlier V3 experiments).
+
+Free quota at this check: USD 5.413866925 daily / 81.857824775 monthly. Started
+only Haiku solo on the existing frozen `duma-v4-solo/1`: run 5487724, 105 rows.
+Its preflights already passed strict audits. Haiku dual is not scheduled yet:
+wait for solo completion, inspect cost/coverage, then reread quota before dual.
+Do not include partial Haiku results in a full two-regime ranking or change
+the existing full task versions/protocol to accommodate unavailable models.
+
+The entries below retain earlier investigation/scheduling history; current
+completion/scheduling state is the paragraph above.
+
 Current provider-ID investigation, explicitly requested on 2026-10-26:
 the prior retries only covered Kaggle's advertised, old model identities.
 Official provider documentation now lists Qwen3.8 Flash, GLM-5.3 and DeepSeek
