@@ -40,6 +40,26 @@ do not schedule the entire matrix blindly or buy paid API capacity.
 
 ### Active Full Evaluation
 
+Chinese-model recheck requested explicitly by the user on 2026-10-26: refreshed
+the advertised catalog and repeated one tool-only API probe per Chinese model
+on `duma-v4-r013-model-compatibility/1`, reasoning minimal, max_tokens 512.
+All six fresh attempts failed before demonstrating tool compatibility:
+
+| Model | Fresh run | Result |
+|---|---:|---|
+| Qwen3 235B A22B Instruct 2507 | 5487300 | HTTP 404, model may no longer be available |
+| GLM-5 | 5487301 | HTTP 404, model may no longer be available |
+| Qwen3 Next 80B A3B Instruct | 5487302 | HTTP 404, model may no longer be available |
+| Qwen3 Next 80B A3B Thinking | 5487303 | HTTP 404, model may no longer be available |
+| Qwen3 Coder 480B A35B Instruct | 5487304 | HTTP 404, model may no longer be available |
+| DeepSeek-R1 0528 | 5487305 | HTTP 400, tool calling not supported |
+
+Fresh outputs/source notebooks: `.cache/kaggle-v4-chinese-recheck-20261026`;
+previous diagnostic directories remain untouched. The previously completed
+Gemini validation 5484237 is also downloaded there, but is not a fresh attempt.
+These are compatibility diagnostics, never DUMA security scores. No replacement
+has been pinned; no task, protocol or ongoing GPT full run was changed.
+
 Latest follow-up, 2026-10-26: Gemini full runs 5484273 (solo) / 5484274 (dual)
 both completed. Strict frozen-wheel audit passed 210/210 rows, 60 NL-scored
 rows, no technical/incomplete episodes. Hosted aggregation matched independent
