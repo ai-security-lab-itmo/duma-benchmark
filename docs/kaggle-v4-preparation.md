@@ -1,6 +1,6 @@
 # Unified V4 Preparation
 
-Date: 2026-10-26. Private full Gemini V4 matrix running; other-target checks in progress.
+Date: 2026-10-26. Private three-target V4 evaluation complete and audited; not published.
 Work remains on `codex/kaggle-benchmarks`; no merge/publication.
 
 ## User Decision And Protocol
@@ -39,6 +39,42 @@ do not schedule the entire matrix blindly or buy paid API capacity.
 ## Frozen Candidate
 
 ### Active Full Evaluation
+
+Final three-target check, 2026-10-26: Haiku solo 5487724 and dual 5487762 both
+completed. The user explicitly requested dual to run alongside solo after the
+initial staged launch; no automatic favorable retries were performed.
+
+Strict combined audit passed 630/630 episodes across all six matrices, including
+180 NL-scored rows. All matrices have 100% coverage with no technical errors or
+unfinished episodes. Frozen identities/checksums, environment replay and hosted
+versus independent aggregation matched. This is not an independent manual audit
+or fresh judge scoring of all communication decisions.
+
+| Target | Solo compliance | Dual compliance | Solo / dual failed rows |
+|---|---:|---:|---:|
+| Gemini 3.8 Flash | 99/105 (94.29%) | 101/105 (96.19%) | 6 / 4 |
+| GPT-5.4 mini | 98/105 (93.33%) | 91/105 (86.67%) | 7 / 14 |
+| Claude Haiku 4.5 | 99/105 (94.29%) | 93/105 (88.57%) | 6 / 12 |
+
+Higher compliance is better; its complement is assertion failure, not uniformly
+confirmed attack success. These V4 rows remain separate from V3 and paper results.
+Haiku dual failures concentrate in collab (9/18 rows) and tool_shadow_poison
+(3/9); solo failures are six collab rows. Do not infer statistical significance
+from small score differences across only three repeats per task.
+
+Final report: `.cache/kaggle-v4-full-results/verified-three-targets.json`, checksum
+`bb4540770767ce685668aaad6ec5b357c04c35c83613a86e51767b2c581d1566`.
+All-role evaluation costs: Gemini USD 3.089688225, GPT USD 1.2789853, Haiku USD
+2.6843404; total USD 7.053013925, excluding compatibility diagnostics and V3.
+Latest free quota snapshot: USD 2.729526525 daily / 79.173484375 monthly.
+
+No full run remains active. No public release or merge was performed. Chinese
+model availability remains unresolved; they have no V4 scores. Before public
+release, review the V4 failed trajectories, refresh release descriptions/cards
+from this audited report, and reconcile live privacy/artifact visibility again.
+
+Everything below is historical preparation/progress evidence; final state above
+supersedes earlier pending/active run notes and staged scheduling instructions.
 
 Latest completion check, 2026-10-26: GPT solo 5487055 and dual 5487056 both
 completed. Combined strict audit passed 420/420 Gemini/GPT episodes, including
