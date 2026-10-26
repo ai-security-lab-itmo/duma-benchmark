@@ -40,6 +40,47 @@ do not schedule the entire matrix blindly or buy paid API capacity.
 
 ### Active Full Evaluation
 
+Current provider-ID investigation, explicitly requested on 2026-10-26:
+the prior retries only covered Kaggle's advertised, old model identities.
+Official provider documentation now lists Qwen3.8 Flash, GLM-5.3 and DeepSeek
+V4.1 Flash (`deepseek-flash`). New generations support tool calling; the old
+DeepSeek-R1 endpoint rejection must not be generalized to current DeepSeek.
+
+To test actual routing rather than only the picker, created private diagnostic
+`duma-current-chinese-model-id-probe/1`, run 5487426. It uses Kaggle's hosted
+OpenAI-compatible proxy directly, omits reasoning/temperature, caps output at
+128 tokens, supplies a side-effect-free ping tool and disables retries. It
+does not call provider endpoints directly, change DUMA or produce a model score.
+The automatic task label is Gemini, but the report explicitly records each
+requested Chinese model ID; never interpret that label as a Gemini evaluation.
+
+All six real requests returned HTTP 404 with explicit `model ... was not found`:
+
+- `qwen/qwen3.8-flash`, `qwen3.8-flash`
+- `zai/glm-5.3`, `glm-5.3`
+- `deepseek-ai/deepseek-flash`, `deepseek-flash`
+
+The proxy's OpenAI-compatible models-list endpoint also returned 404. A temporary
+local proxy token's models-list attempt returned 404 too; local tokens have a
+restricted model subset, so the hosted calls are the relevant routing evidence.
+No token was printed or persisted. No external paid provider API was called.
+These results establish that tested current IDs are not available through the
+accessible Kaggle proxy; they do not establish global/provider unavailability
+or whether the root cause is routing configuration versus access/catalog policy.
+
+Evidence: `.cache/kaggle-current-model-id-probe-results`, including exact HTTP
+messages in `current-model-id-probe.json` and executed source notebook. Standalone
+probe source: `.cache/kaggle-current-model-id-probe/probe.py`; no DUMA Dataset
+attached, no runtime/provider dependencies added, no active full run modified.
+
+Primary documentation checked:
+
+- https://docs.modelstudio.console.alibabacloud.com/en/model-studio/qwen3-8-flash
+- https://docs.z.ai/guides/llm/glm-5.3
+- https://api-docs.deepseek.com/quick_start/agent_integrations/
+- https://api-docs.deepseek.com/quick_start/pricing/
+- https://github.com/Kaggle/kaggle-cli/blob/main/docs/benchmarks.md
+
 Chinese-model recheck requested explicitly by the user on 2026-10-26: refreshed
 the advertised catalog and repeated one tool-only API probe per Chinese model
 on `duma-v4-r013-model-compatibility/1`, reasoning minimal, max_tokens 512.
