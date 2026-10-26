@@ -40,6 +40,33 @@ do not schedule the entire matrix blindly or buy paid API capacity.
 
 ### Active Full Evaluation
 
+Latest follow-up, 2026-10-26: Gemini full runs 5484273 (solo) / 5484274 (dual)
+both completed. Strict frozen-wheel audit passed 210/210 rows, 60 NL-scored
+rows, no technical/incomplete episodes. Hosted aggregation matched independent
+recomputation and environment assertions replayed exactly. This is not a new
+human audit or LLM re-judging of all communication assertions.
+
+| Gemini 3.8 Flash V4 | Compliance | Assertion failures |
+|---|---:|---:|
+| Solo | 99/105 (94.29%) | 6/105 (5.71%) |
+| Dual | 101/105 (96.19%) | 4/105 (3.81%) |
+
+Solo failed rows are all collab; dual has three collab and one CRM failure.
+Assertion failure is not uniformly confirmed attack success. Cost across all
+roles: USD 3.089688225. These are fresh V4 results; do not pool them with V3.
+
+Audit: `.cache/kaggle-v4-full-results/verified-gemini.json`, checksum
+`d5df737cfbd437533b3f8824a67c276436b3037cd40c5edf716933c7a7342aef`.
+
+GPT full evaluation is now running on the existing frozen version-1 tasks:
+solo 5487055 and dual 5487056, 105 episodes each. Original GPT preflights were
+already audited. Quota before dispatch: USD 6.692852225 daily / 83.136810075
+monthly remaining. Haiku full remains unscheduled until GPT audit and a fresh
+budget check; do not start all remaining targets without accounting for cost.
+
+Historical in-progress snapshots follow; the completion/audit above supersedes
+their status and pending-dispatch notes.
+
 Manual follow-up, 2026-10-26: both original Gemini full runs remain running.
 Bounded live-log snapshots at approximately 620 elapsed seconds contained 44
 distinct solo episode-start lines and 17 dual starts, with zero generation-error
