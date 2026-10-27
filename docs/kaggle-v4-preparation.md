@@ -1,6 +1,8 @@
 # Unified V4 Preparation
 
-Date: 2026-10-26. Private three-target V4 evaluation complete and audited; not published.
+Updated: 2026-10-28. Private three-target baseline complete and audited; two-target
+expansion running. See `kaggle-v4-expansion-20261028.md` for current run IDs and
+fresh Chinese-model probes. Not published.
 Work remains on `codex/kaggle-benchmarks`; no merge/publication.
 
 ## User Decision And Protocol
