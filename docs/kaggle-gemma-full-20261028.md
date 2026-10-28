@@ -73,6 +73,11 @@ synthetic safety score. Only version 2 was used for actual full Gemma runs.
 
 ## Next Check
 
+Both full runs have now terminated with incomplete matrices. The user requested
+offline reassessment; see `kaggle-gemma-rescore-20261028.md` for the audited
+210-row result, preserved execution coverage, and separately labeled
+observed-trace versus execution-aware scores. No full reruns were scheduled.
+
 Inspect run IDs above, download their raw outputs and executed notebooks, then
 independently verify the complete 210-row matrix. Check the separate profile
 and adapter identity, original ENV replay, NL assertion schema/call counts,
