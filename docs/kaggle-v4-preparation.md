@@ -1,8 +1,9 @@
 # Unified V4 Preparation
 
-Updated: 2026-10-28. Private three-target baseline complete and audited; two-target
-expansion running. See `kaggle-v4-expansion-20261028.md` for current run IDs and
-fresh Chinese-model probes. Not published.
+Updated: 2026-10-28. Private five-target evaluation complete and audited:
+1,050/1,050 episodes, including 300 NL-scored rows. See
+`kaggle-v4-expansion-20261028.md` for final five-target results and fresh
+Chinese-model probes. Earlier three-target history below is preserved. Not published.
 Work remains on `codex/kaggle-benchmarks`; no merge/publication.
 
 ## User Decision And Protocol

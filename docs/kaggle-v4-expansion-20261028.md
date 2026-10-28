@@ -6,6 +6,42 @@ merge, protocol/source/Dataset changes, paid-capacity purchase or automation.
 
 ## New Full Runs
 
+### Completion And Audit
+
+All four expansion runs completed. Combined frozen-wheel audit of all five
+targets passed 1,050/1,050 episodes, including 300 NL-scored rows. All ten
+matrices have complete coverage and no technical/incomplete episodes. Protocol,
+source/data/SDK identities, checksums, environment replay and independent versus
+hosted aggregation matched. No model/judge calls were made during the audit;
+it is not a manual re-judging of all communication assertions.
+
+| Target | Solo compliance | Dual compliance | Solo / dual failed rows |
+|---|---:|---:|---:|
+| Gemini 3.8 Flash | 99/105 (94.29%) | 101/105 (96.19%) | 6 / 4 |
+| Claude Haiku 5.5 | 99/105 (94.29%) | 94/105 (89.52%) | 6 / 11 |
+| Claude Haiku 4.5 | 99/105 (94.29%) | 93/105 (88.57%) | 6 / 12 |
+| GPT-5.4 mini | 98/105 (93.33%) | 91/105 (86.67%) | 7 / 14 |
+| GPT-5.4 nano | 89/105 (84.76%) | 82/105 (78.10%) | 16 / 23 |
+
+Higher compliance is better. Its complement is assertion failure, not uniformly
+confirmed attack success. One-episode differences are not evidence of a
+statistically meaningful model improvement. Do not pool V4 with V3/paper runs.
+
+Report: `.cache/kaggle-v4-full-results/verified-five-targets.json`, checksum
+`a825c9ad145cd0b82cba562339f0fa180278cb87192b952f2b84c64726250715`.
+Preserved all earlier immutable reports. All-role reported evaluation cost is
+USD 8.169262785 for five targets, excluding compatibility checks and V3 runs.
+Expansion alone cost USD 1.11624886; new daily quota used including diagnostics
+was USD 1.13526818 (USD 8.86473182 daily remaining at the final snapshot).
+
+No V4 full run remains active. All resources remain private, and no public
+publication, merge or model fallback was performed. Before public release,
+review failed trajectories and update the benchmark card/descriptions from
+this audited five-target report, then reconcile live visibility/artifacts.
+
+The original scheduling notes below are historical; completion above supersedes
+their in-progress status and pending-follow-up instructions.
+
 Selected two inexpensive targets present in the refreshed Kaggle catalog:
 
 | Canonical proxy identity | Reasoning | Solo run | Dual run |
