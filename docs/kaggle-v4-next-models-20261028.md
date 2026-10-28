@@ -46,6 +46,13 @@ retried to obtain better scores.
 
 ## Initial Candidates Not Promoted
 
+Subsequent explicit Gemma parameter experiments found a working diagnostic
+adapter (omit reasoning, stable solo user dot), with 3/3 actual task episodes
+audited. See `kaggle-gemma-experiments-20261028.md`. These are separately labeled
+experiments, not V4 rows; the frozen full tasks were not changed and no full
+Gemma evaluation was launched. The original rejection records below remain valid
+for their original configuration.
+
 Originally selected Gemma 4 31B and Gemini 3.1 Flash-Lite Preview to broaden the
 pool. Their original diagnostics were preserved, not repaired or relabeled:
 
