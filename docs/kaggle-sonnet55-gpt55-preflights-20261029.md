@@ -1,5 +1,11 @@
 # Private Candidate Checks: Sonnet 5.5 And GPT-5.5
 
+Subsequent explicit user authorization requested full runs. The daily quota
+refilled, GPT-5.5's quota-related communication interruption was retried and
+audited, and both full GPT-5.5 runs were dispatched. Sonnet required a distinct
+transport profile. See `kaggle-gpt55-sonnet55-full-20261029.md` for current
+results/dispatch; the initial scheduling notes below are historical.
+
 Date: 2026-10-29, Asia/Tbilisi. The user requested additional models.
 Refreshed the live Kaggle catalog and selected two previously unevaluated
 targets without changing any existing model labels or results.
