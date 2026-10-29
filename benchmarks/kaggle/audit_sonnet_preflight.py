@@ -12,6 +12,7 @@ from loguru import logger
 from duma.data_model.message import AssistantMessage, UserMessage
 from duma.integrations.kaggle.artifacts import read_checkpoint, write_checkpoint
 from duma.integrations.kaggle.backend import KaggleBackend
+from duma.integrations.kaggle.metrics import aggregate, evaluation_rows
 from duma.integrations.kaggle.protocol import (
     KaggleProtocol,
     ModelSettings,
@@ -62,7 +63,11 @@ def select_attempts(paths, retry_paths):
     return [value[0] for value in selected.values()], superseded
 
 
-def audit(results, bundle, retry_results=None):
+def audit(results, bundle, retry_results=None, full=False):
+    if full and retry_results:
+        raise ValueError(
+            "Full matrices require a separately declared resume, not a preflight retry"
+        )
     root = Path(__file__).parent
     path = root / "sonnet_default.py"
     tree = ast.parse(path.read_text())
@@ -87,10 +92,16 @@ def audit(results, bundle, retry_results=None):
     )
     adapter_sha = hashlib.sha256(path.read_bytes()).hexdigest()
     expected = {
-        ("collab", "collab_poisoning_logs", "dual"),
-        ("output_handling", "output_xss_block", "dual"),
+        ("collab", "collab_poisoning_logs", "dual", 0, 300),
+        ("output_handling", "output_xss_block", "dual", 0, 300),
     }
+    if full:
+        expected = {
+            tuple(row[k] for k in ("domain", "task_id", "regime", "trial", "seed"))
+            for row in evaluation_rows(base, "dual")
+        }
     seen, rows, profile_hashes = set(), [], set()
+    artifacts = []
     paths, superseded = select_attempts(
         sorted(results.glob("**/duma-sonnet55-results/*.json")),
         sorted(retry_results.glob("**/duma-sonnet55-results/*.json"))
@@ -117,41 +128,60 @@ def audit(results, bundle, retry_results=None):
             }
         ):
             raise ValueError("Unexpected Sonnet adapter/settings")
-        key = tuple(meta[k] for k in ("domain", "task_id", "regime"))
-        if (
-            key not in expected
-            or key in seen
-            or (meta["trial"], meta["seed"]) != (0, 300)
-        ):
+        key = tuple(meta[k] for k in ("domain", "task_id", "regime", "trial", "seed"))
+        if key not in expected or key in seen:
             raise ValueError("Unexpected Sonnet preflight row")
         seen.add(key)
         check = helpers["verify_episode"](item, profile, source, data)
-        if check is None:
+        if check is None and not full:
             raise ValueError("Sonnet preflight did not complete")
+        artifacts.append(item)
         profile_hashes.add(profile.fingerprint)
         rows.append(
             {
                 "domain": key[0],
                 "task_id": key[1],
                 "regime": key[2],
+                "trial": key[3],
+                "seed": key[4],
+                "status": item["status"],
                 "score": item["score"],
                 "artifact_hash": item["artifact_hash"],
-                **check,
+                **(check or {}),
             }
         )
     if seen != expected or len(profile_hashes) != 1:
         raise ValueError("Missing or mixed Sonnet preflights")
+    matrix = None
+    if full:
+        matrix = aggregate(
+            artifacts, profile, "anthropic/claude-sonnet-5-5@default", "dual"
+        )
+        summary_paths = list(results.glob("**/duma-sonnet55-results/summaries/*.json"))
+        if len(summary_paths) != 1:
+            raise ValueError("Missing or duplicate hosted matrix summary")
+        stored = json.loads(summary_paths[0].read_text())
+        from duma.integrations.kaggle.artifacts import checksum
+
+        if stored["artifact_hash"] != checksum(stored) or any(
+            not helpers["same_summary"](
+                json.loads(json.dumps(value)), stored.get(field)
+            )
+            for field, value in matrix.items()
+        ):
+            raise ValueError("Hosted versus offline matrix aggregation mismatch")
     return {
-        "complete": True,
+        "complete": matrix["complete"] if full else True,
         "observed": len(rows),
-        "expected": 2,
+        "expected": len(expected),
         "profile_hash": next(iter(profile_hashes)),
         "adapter_sha256": adapter_sha,
         "source_hash": source,
         "data_hash": data,
         "rows": rows,
         "superseded_technical_attempts": superseded,
-        "scope": "Two dual compatibility episodes, not a full leaderboard score; no new model/judge calls",
+        "matrix": matrix,
+        "scope": "Offline Sonnet artifact audit; incomplete matrices have no final score. No new model/judge calls.",
     }
 
 
@@ -161,10 +191,11 @@ if __name__ == "__main__":
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--retry-results", type=Path)
+    parser.add_argument("--full", action="store_true")
     args = parser.parse_args()
     logger.remove()
     if args.output.exists():
         raise FileExistsError("Audit reports are immutable")
-    report = audit(args.results, args.bundle, args.retry_results)
+    report = audit(args.results, args.bundle, args.retry_results, full=args.full)
     write_checkpoint(args.output, report)
     print(json.dumps(report, indent=2))

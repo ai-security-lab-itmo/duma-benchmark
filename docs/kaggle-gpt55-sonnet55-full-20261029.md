@@ -5,6 +5,47 @@ of the two candidates. No public publication, main merge or paid top-up.
 
 ## Final Dispatch Snapshot
 
+### Completed Run Check
+
+All three actual full runs have terminated. Raw outputs and executed notebooks
+were downloaded; no fresh model calls or retries were made during this check.
+
+| Target/regime | Completed | Passes | Completed failures | Unfinished | Original full score |
+|---|---:|---:|---:|---:|---:|
+| GPT-5.5 solo | 105/105 | 97 | 8 | 0 | 92.38% |
+| GPT-5.5 dual | 90/105 | 84 | 6 | 15 | unavailable |
+| Sonnet 5.5 dual | 28/105 | 25 | 3 | 77 | unavailable |
+
+GPT-5.5 dual logs contain 15 quota-reservation HTTP 403 interruptions. Sonnet
+dual contains 71 quota-reservation HTTP 403 interruptions and six empty
+assistant responses. All are preserved as technical errors, not confirmed
+attacks or safety passes. The proxy refused to reserve maximum response cost
+after daily quota depleted. No output limits or scoring rules were lowered
+to force completion and no paid top-up was purchased.
+
+Original V4 audit over eleven targets verified 2,310/2,310 artifacts and
+645 NL-scored completed rows; 19/22 matrices are complete. Report:
+`.cache/kaggle-v4-full-results/verified-eleven-targets-incomplete.json`, checksum
+`729919bf0bd9dd382138aa569cd8859f65bf649404b7a2c6222cb11c8d022a85`.
+Overall `complete=false` remains intentional, including earlier incomplete
+Flash-Lite and GPT-5.6 Luna matrices. Prior post-hoc views remain separate.
+
+Separate Sonnet full audit verified 105/105 artifacts, original ENV/NL scoring
+for completed episodes, exact v2 profile/source/data/SDK identities, checksums
+and independent versus hosted aggregation. Report:
+`.cache/kaggle-sonnet55-full-results/verified-incomplete.json`, checksum
+`10f908095fc08e10d6e26a7dd67a8535746ce733cb58638ac93d77288101c0e8`.
+Its full score is null with 26.67% execution coverage. Unknown target usage cost
+is retained as null, never replaced by zero.
+
+The next evaluation step should resume only the original 15 interrupted
+GPT-5.5 dual and 77 interrupted Sonnet dual rows after checking fresh quota,
+using matching profile/code/data identities and preserving completed policy
+failures. Avoid concurrent expensive full matrices near the daily limit.
+No such resume was scheduled during this status-only turn.
+
+The dispatch snapshot below is historical and superseded by these results.
+
 | Target | Regime | Task | Run | Episodes |
 |---|---|---|---:|---:|
 | GPT-5.5 | solo | duma-v4-solo/1 | 5699820 | 105 |
