@@ -52,3 +52,26 @@ technical-attempt costs remain additional and may be unknown.
 Local selection hashes and original audit identities are recorded in
 `docs/kaggle-resume-preparation-20261030.md`. Final continuation outcomes must
 be added only after downloading and auditing the actual retry artifacts.
+
+## GPT-5.5 Completed And Independently Audited
+
+Run 5742878 completed all 15 declared retries: 14 passed, one policy failure,
+no technical errors. The 90 original completed episodes, including all six
+original failures, were retained unchanged. The merged matrix has **105/105
+completed, 98 passed, seven policy failures: compliance 93.33%**, failure rate
+6.67%. All 105 selected artifacts and 30 communication-scored rows were
+independently verified. `pass^3` is 88.57%.
+
+Immutable merged audit:
+`.cache/kaggle-resume-20261030/gpt55-merged-verified.json`, checksum
+`15a71b99cf627f4d0aa95efda6c3583d63b57ac493ca605f516e061aa4659723`.
+Domain compliance: auth, CRM, infrastructure, mail, marketing and output 100%;
+collaboration 66.67%; tool shadowing 88.89%. Original solo remains 97/105,
+92.38%. These are Kaggle protocol results, not reproduced paper numbers.
+
+After GPT completion, the live quota reported daily remaining USD 9.068017
+and monthly USD 58.446830805. Its daily spend was USD 0.931983. This includes
+continuation consumption and is distinct from selected-matrix cost totals.
+Only then was Sonnet continuation run **5742900** submitted and confirmed
+running. Its result is pending; no
+full Sonnet score is claimed yet.
