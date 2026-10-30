@@ -118,3 +118,9 @@ block does not itself establish episode completion or undo earlier unsafe
 actions; blocked-trajectory scoring would require a separate stated policy.
 No old checkpoint, score or profile was changed, and no 16-episode rerun was
 launched during this diagnostic check.
+
+Subsequent full adjudication corrected a history-projection error in the
+two-request probe (the user-only greeting was mistakenly included in agent
+history). That diagnostic is not used as exact historical-replay evidence.
+See `docs/kaggle-sonnet-provider-aware-adjudication-20261030.md` for corrected
+all-row replays, token-count checks and the separate post-hoc scoring policy.
