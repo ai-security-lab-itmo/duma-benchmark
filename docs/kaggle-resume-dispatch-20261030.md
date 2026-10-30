@@ -75,3 +75,26 @@ continuation consumption and is distinct from selected-matrix cost totals.
 Only then was Sonnet continuation run **5742900** submitted and confirmed
 running. Its result is pending; no
 full Sonnet score is claimed yet.
+
+## Sonnet Continuation Audited
+
+Checked on 2026-10-30 (Europe/Moscow). Run 5742900 completed at 08:32:45 UTC.
+All 77 declared retries produced artifacts: 61 completed (58 passed, three
+policy failures), 16 technical errors (`RuntimeError`). The terminal log
+contains repeated Model Proxy `choices[0].message=None` warnings for Sonnet.
+No quota-denial early stop occurred. Failed-row domains: marketing eight,
+collaboration four, output two, mail two.
+
+Preserving the 28 original completed rows gives 89/105 completed, 83 passed,
+six policy failures and 16 technical errors. The full compliance score remains
+null, not a leaderboard result. No failures were converted into successes or
+resampled in this status-check turn. All 105 selected artifacts and 28
+completed communication-scored rows were independently verified.
+
+Immutable audit: `.cache/kaggle-resume-20261030/sonnet55-merged-verified.json`,
+checksum `c8ca23bbf228ebd971ae199aa018f3ee9ddd8eb3fa50ddc83d9439b6af663ffa`.
+Quota after completion: daily remaining USD 6.4690513, monthly USD 55.847865105.
+The continuation consumed approximately USD 2.5989657 since the previous
+quota check; target per-role cost remains unknown in stored artifacts.
+Both tasks remain private. Further work should diagnose the empty-response
+transport behavior before spending quota on another retry selection.
