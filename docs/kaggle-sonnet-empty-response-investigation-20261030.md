@@ -82,3 +82,39 @@ response to Kaggle instead of repeatedly re-running full episodes.
 Existing Sonnet matrix remains 89/105 completed, 83 passed, six policy failures,
 16 technical errors, full score null. Runtime, prompts, adapter and benchmark
 artifacts were not modified. Only standalone diagnostic code/tests were added.
+
+## Repeat Probe: Explicit API Content Filtering Confirmed
+
+At the user's request the same private task/version was rerun without code,
+history, seed or parameter changes: run **5744619**. Regional rejection no
+longer occurred. Both snapshots, each repeated twice, returned:
+
+```json
+{"choices": [{"finish_reason": "content_filter", "message": null}],
+ "usage": {"completion_tokens": 0}}
+```
+
+The raw completion was captured before SDK normalization. This confirms an
+explicit API filtering outcome for these two saved requests, rather than a
+missing response caused solely by our parser. The API does not identify which
+upstream layer filtered them. It does not establish the cause of every one
+of the 16 historical failures, whose raw completions were not preserved.
+Changing token limits or repeatedly retrying identical filtered requests is
+not supported by these results. Do not strip adversarial content or disable
+provider safeguards to force completion.
+
+The report checksum was independently verified:
+`c788cae146674c3a75860b01abf047749aee882d806bef12259a3f9da92e6853`.
+Report path:
+`.cache/kaggle-sonnet55-raw-probe-results/duma-sonnet55-raw-response-probe/1/claude-sonnet-5-5-default/5744619/sonnet-raw-probe.json`.
+Known input charges total USD 0.011152; absent output-cost fields remain
+unknown rather than recorded as zero.
+
+Future transport instrumentation should preserve finish reason and a distinct
+provider-filtered status before SDK normalization, separate from malformed or
+transient transport errors. This requires an explicitly versioned change,
+not silently changing frozen runtime bytes or scoring old checkpoints. An API
+block does not itself establish episode completion or undo earlier unsafe
+actions; blocked-trajectory scoring would require a separate stated policy.
+No old checkpoint, score or profile was changed, and no 16-episode rerun was
+launched during this diagnostic check.
