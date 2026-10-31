@@ -9,13 +9,36 @@ import runpy
 
 from loguru import logger
 
-from duma.integrations.kaggle.artifacts import read_checkpoint, write_checkpoint
+from duma.integrations.kaggle.artifacts import (
+    checksum,
+    read_checkpoint,
+    write_checkpoint,
+)
 from duma.integrations.kaggle.metrics import aggregate, evaluation_rows
 from duma.integrations.kaggle.protocol import KaggleProtocol, fingerprint_files
 from duma.utils.utils import DATA_DIR
 
 
-def audit(results, bundle):
+def select_retry(items, new, source_hash):
+    if checksum(new) != new.get("artifact_hash"):
+        raise ValueError("Retry checksum mismatch")
+    matches = [i for i, old in enumerate(items) if old["metadata"] == new["metadata"]]
+    if len(matches) != 1:
+        raise ValueError("Retry identity differs from exactly one original row")
+    index = matches[0]
+    old = items[index]
+    if (
+        old["status"] == "completed"
+        or old["score"] is not None
+        or old["artifact_hash"] != source_hash
+    ):
+        raise ValueError("Cannot replace a completed or undeclared source row")
+    selected = list(items)
+    selected[index] = new
+    return selected, index
+
+
+def audit(results, bundle, retry_path=None):
     paths = sorted(results.glob("**/duma-kaggle-results/*.json"))
     if len(paths) != 105:
         raise ValueError("Expected all 105 artifacts")
@@ -96,6 +119,39 @@ def audit(results, bundle):
         wire = read_checkpoint(wire_paths[0], None)
         if wire["row"] != row or wire["profile_hash"] != profile.fingerprint:
             raise ValueError("Wire record identity mismatch")
+    original_matrix, retry_provenance = actual, None
+    if retry_path:
+        prior = read_checkpoint(results / "verified-incomplete.json", None)
+        if prior[
+            "artifact_hash"
+        ] != "f06f7290cfb3074a93cb19f77d3b93d775958c9a6d5cb39199330b846705c94f" or {
+            x["artifact_hash"] for x in prior["rows"]
+        } != {x["artifact_hash"] for x in items}:
+            raise ValueError("Original matrix differs from pinned audit")
+        raw = json.loads(retry_path.read_text())
+        new = read_checkpoint(retry_path, raw["metadata"])
+        items, index = select_retry(
+            items,
+            new,
+            "f31cab08ae2e84939b6731cc7c4f54df83551611e745824f46583a4224e8a73a",
+        )
+        checked = helper["verify_episode"](new, profile, source, data)
+        if checked:
+            nl += int(checked["nl_scored"])
+        retry_provenance = {
+            "source_audit_hash": prior["artifact_hash"],
+            "original_artifact_hash": rows[index]["artifact_hash"],
+            "new_artifact_hash": new["artifact_hash"],
+            "preserved_rows": 104,
+        }
+        rows[index] = {
+            "row": rows[index]["row"],
+            "status": new["status"],
+            "score": new["score"],
+            "artifact_hash": new["artifact_hash"],
+            **(checked or {}),
+        }
+        actual = aggregate(items, profile, "openai/gpt-oss-120b", "dual")
     return {
         "profile_hash": profile.fingerprint,
         "source_hash": source,
@@ -104,6 +160,8 @@ def audit(results, bundle):
         "verified_nl_rows": nl,
         "verified_wire_rows": 105,
         "matrix": actual,
+        "original_matrix": original_matrix,
+        "retry_provenance": retry_provenance,
         "hosted_summary_hash": stored["artifact_hash"],
         "rows": rows,
         "scope": "Original strict scoring, no model/judge calls or safe-block adjudication; incomplete matrix has no final score",
@@ -114,10 +172,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("results", "bundle", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--retry", type=Path)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError("Immutable audit output already exists")
     logger.remove()
-    report = audit(args.results, args.bundle)
+    report = audit(args.results, args.bundle, args.retry)
     write_checkpoint(args.output, report)
     print(json.dumps({k: v for k, v in report.items() if k != "rows"}, indent=2))
