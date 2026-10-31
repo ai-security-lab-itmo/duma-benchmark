@@ -23,7 +23,7 @@ from duma.data_model.tasks import EnvFunctionCall, InitializationData, Task
 from duma.environment.environment import Environment, EnvironmentInfo
 from duma.user.base import BaseUser, is_valid_user_history_message
 from duma.user.user_simulator import DummyUser, UserSimulator, UserState
-from duma.utils.llm_utils import get_cost
+from duma.utils.generation import get_cost
 from duma.utils.utils import format_time, get_now
 
 

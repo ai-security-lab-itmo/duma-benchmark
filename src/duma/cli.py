@@ -2,6 +2,13 @@ import argparse
 import json
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# CLI configuration must see the legacy .env before importing model defaults.
+# ruff: noqa: E402
+
 from duma.config import (
     DEFAULT_AGENT_IMPLEMENTATION,
     DEFAULT_LLM_AGENT,
