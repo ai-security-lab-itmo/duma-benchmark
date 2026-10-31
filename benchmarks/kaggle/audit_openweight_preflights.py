@@ -1,7 +1,9 @@
 """Offline diagnostics audit, preserving incomplete rows and valid failures."""
 
 import argparse
+import ast
 from collections import Counter
+import hashlib
 import json
 from pathlib import Path
 import runpy
@@ -12,7 +14,11 @@ from duma.data_model.simulation import SimulationRun, TerminationReason
 from duma.data_model.tasks import RewardType
 from duma.evaluator.evaluator_env import EnvironmentEvaluator
 from duma.integrations.kaggle.artifacts import read_checkpoint, write_checkpoint
-from duma.integrations.kaggle.protocol import fingerprint_files, load_protocol
+from duma.integrations.kaggle.protocol import (
+    KaggleProtocol,
+    fingerprint_files,
+    load_protocol,
+)
 from duma.registry import registry
 from duma.runtime import get_tasks
 from duma.utils.utils import DATA_DIR
@@ -26,16 +32,40 @@ EXPECTED = {
 
 
 def audit(results, model, mode, protocol_path, bundle, dual_only=False):
-    base = load_protocol(protocol_path)
+    if mode == "gptoss-compat":
+        path = Path(__file__).with_name("gptoss_compat_preflight.py")
+        config = json.loads(protocol_path.read_text())
+        if (
+            hashlib.sha256(path.read_bytes()).hexdigest()
+            != config["wire_adapter_sha256"]
+        ):
+            raise ValueError("Compatibility adapter identity changed")
+        nodes = [
+            n for n in ast.parse(path.read_text()).body if isinstance(n, ast.ClassDef)
+        ]
+        ns = {"KaggleProtocol": KaggleProtocol}
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), str(path), "exec"), ns)
+        base = ns["GPTOSSProtocol"].model_validate(config)
+    else:
+        base = load_protocol(protocol_path)
     base.validate_data(DATA_DIR)
     helper = runpy.run_path(str(Path(__file__).with_name("verify_results.py")))
     source = helper["wheel_identity"](bundle)
     data = fingerprint_files(
         DATA_DIR / "duma", ("domains/**/*.*", "user_simulator/*.md")
     )
-    folder = "gemma-duma-diagnostics" if mode == "gemma" else "duma-kaggle-results"
+    folder = {
+        "gemma": "gemma-duma-diagnostics",
+        "gemma-native": "gemma-native-solo-diagnostics",
+        "standard": "duma-kaggle-results",
+        "gptoss-compat": "duma-kaggle-results",
+    }[mode]
     rows, seen = [], set()
     expected = {key for key in EXPECTED if not dual_only or key[2] == "dual"}
+    if mode == "gemma-native":
+        expected = {("collab", "collab_poisoning_logs", "solo")}
+    if mode == "gptoss-compat":
+        expected = {("output_handling", "output_xss_block", "dual")}
     for path in sorted(results.glob(f"**/{folder}/*.json")):
         raw = json.loads(path.read_text())
         item = read_checkpoint(path, raw["metadata"])
@@ -49,7 +79,7 @@ def audit(results, model, mode, protocol_path, bundle, dual_only=False):
         ):
             raise ValueError("Unexpected/duplicate row or target")
         seen.add(key)
-        if mode == "gemma":
+        if mode in {"gemma", "gemma-native"}:
             if (
                 meta["base_protocol_hash"] != base.fingerprint
                 or meta["base_source_hash"] != source
@@ -68,8 +98,15 @@ def audit(results, model, mode, protocol_path, bundle, dual_only=False):
                 or meta["solo_transport_prefix"] != ("." if key[2] == "solo" else None)
             ):
                 raise ValueError("Changed Gemma adapter settings")
-            if meta["diagnostic_version"] != "duma-gemma-omit-reasoning-probe-v1":
+            version = (
+                "duma-gemma26-native-solo-probe-v1"
+                if mode == "gemma-native"
+                else "duma-gemma-omit-reasoning-probe-v1"
+            )
+            if meta["diagnostic_version"] != version:
                 raise ValueError("Unexpected Gemma diagnostic version")
+            if mode == "gemma-native" and meta.get("target_api") != "genai":
+                raise ValueError("Unexpected native API identity")
         else:
             helper["verify_episode"](item, base, source, data)
         row = {
@@ -151,7 +188,11 @@ if __name__ == "__main__":
     for name in ("results", "protocol", "bundle", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--model", required=True)
-    parser.add_argument("--mode", choices=("gemma", "standard"), required=True)
+    parser.add_argument(
+        "--mode",
+        choices=("gemma", "gemma-native", "standard", "gptoss-compat"),
+        required=True,
+    )
     parser.add_argument("--dual-only", action="store_true")
     args = parser.parse_args()
     logger.remove()

@@ -111,3 +111,9 @@ results were fabricated and no unfinished episode received a score.
 Three focused protocol tests passed; full regression **332 passed, 16 skipped**
 with one upstream deprecation warning. Ruff passed. Changes stay on
 `codex/kaggle-benchmarks`.
+
+Follow-up resolution is documented in
+`docs/kaggle-openweight-transport-investigation-20261031.md`: the GPT-OSS error
+was on the initial request, not tool-result history; filling only empty tool
+descriptions fixes the measured full XSS dual episode. Gemma's solo loop also
+reproduces through native GenAI, so no transport-only repair was established.
