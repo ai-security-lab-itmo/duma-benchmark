@@ -82,3 +82,9 @@ Audit `.cache/kaggle-gptoss-full-results/verified-incomplete.json`, checksum
 Hosted matrix checksum
 `49aa66651be11024eeedd7a9388af4d7f7cba04ec644330291dadcc89292b999`.
 No further model calls or score changes were made during this status audit.
+
+The subsequently authorized single SQL retry (run 5770167) completed and was
+independently merged: 105/105 complete, 90 passes, 15 unchanged failures,
+strict dual compliance 85.71%. See `docs/kaggle-gptoss-sql-retry-20261031.md`
+for both-attempt provenance and final immutable audit. The earlier incomplete
+summary and all original artifacts are retained.
