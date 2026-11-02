@@ -200,6 +200,14 @@ All original downloaded files are retained. No extra inference, selective
 failure resampling or post-hoc score substitution was performed in this
 status check.
 
+On 2026-11-02 the user authorized closing the one unfinished Gemini row.
+Single-row retry run 5788586 completed with score 1 and was independently
+merged, preserving the other 104 dual rows and all 23 failures. Final selected
+Gemini dual compliance is **78.10%** (82/105, complete); solo remains **81.90%**.
+The original incomplete artifacts/summary remain unchanged. See
+`docs/kaggle-gemini25-xss-retry-20261102.md` for retry provenance, full-matrix
+verification and the immutable final audit.
+
 ## Verification
 
 Full regression: **350 passed, 16 skipped**, one existing upstream Starlette
