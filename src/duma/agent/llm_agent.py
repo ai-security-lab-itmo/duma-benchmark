@@ -19,7 +19,7 @@ from duma.data_model.message import (
 )
 from duma.data_model.tasks import Action, Task
 from duma.environment.tool import Tool, as_tool
-from duma.utils.llm_utils import generate
+from duma.utils.generation import generate
 
 AGENT_INSTRUCTION = """
 You are a customer service agent that helps the user according to the <policy> provided below.

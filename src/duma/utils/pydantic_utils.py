@@ -1,6 +1,5 @@
 from typing import Any, Dict, TypeVar
 
-from addict import Dict as AddictDict
 from pydantic import BaseModel, ConfigDict
 
 from .utils import get_dict_hash
@@ -27,8 +26,14 @@ def update_pydantic_model_with_dict(
     """
     Return an updated BaseModel instance based on the update_data.
     """
-    raw_data = AddictDict(model_instance.model_dump())
-    raw_data.update(AddictDict(update_data))
-    new_data = raw_data.to_dict()
+    def merge(target, updates):
+        for key, value in updates.items():
+            if isinstance(target.get(key), dict) and isinstance(value, dict):
+                merge(target[key], value)
+            else:
+                target[key] = value
+
+    new_data = model_instance.model_dump()
+    merge(new_data, update_data)
     model_class = type(model_instance)
     return model_class.model_validate(new_data)

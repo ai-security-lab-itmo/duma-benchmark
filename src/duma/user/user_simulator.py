@@ -21,7 +21,7 @@ from duma.user.base import (
     is_valid_user_history_message,
 )
 from duma.utils import DATA_DIR
-from duma.utils.llm_utils import generate
+from duma.utils.generation import generate
 
 GLOBAL_USER_SIM_GUIDELINES_DIR = DATA_DIR / "duma" / "user_simulator"
 

@@ -5,13 +5,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from deepdiff import DeepDiff
-from dotenv import load_dotenv
 from loguru import logger
-
-res = load_dotenv()
-if not res:
-    logger.warning("No .env file found")
 
 # Try to get data directory from environment variables first.
 # Keep TAU2_DATA_DIR as a legacy fallback for compatibility.
@@ -57,6 +51,8 @@ def show_dict_diff(dict1: dict, dict2: dict) -> str:
     """
     Show the difference between two dictionaries.
     """
+    from deepdiff import DeepDiff
+
     diff = DeepDiff(dict1, dict2)
     return diff
 

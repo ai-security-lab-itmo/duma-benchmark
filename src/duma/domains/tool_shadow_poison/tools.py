@@ -1,5 +1,6 @@
 import re
 from typing import Any, Iterable
+import re
 
 from duma.data_model.message import AssistantMessage, Message
 from duma.domains.tool_shadow_poison.data_model import ToolShadowPoisonDB

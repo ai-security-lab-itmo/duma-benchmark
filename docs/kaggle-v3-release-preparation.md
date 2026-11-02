@@ -1,0 +1,362 @@
+# Hardened V3: Private Validation And Publication Gates
+
+## Authorization And Scope
+
+The user authorized autonomous private preparation up to publication on
+2026-10-24. Do not publish tasks, notebooks, datasets or collections yet.
+All changes remain on `codex/kaggle-benchmarks`; the domain hardening and
+scoring fixes were already merged into main separately.
+
+Order: hosted readiness, one hosted dual episode, solo/communication checks,
+pilot-v6 (3 tasks x 2 regimes x 3 seeds x 2 targets = 36 episodes), artifact and
+scoring audit, then full-v3 (35 tasks x 2 x 3 x 2 = 420 episodes) and release audit.
+The full run starts only after the pilot passes execution/scoring validation.
+Valid policy failures are results, not grounds to change tasks or retry.
+
+Models: targets Gemini 3.8 Flash and GPT-5.4 mini (2026-03-17), reasoning none;
+user Gemini 2.5 Flash (none); judge Gemini 3 Flash Preview (low). No automatic
+model substitution. Maximum 100 steps, 10 errors, seeds 300--302.
+Full-v3 and pilot-v6 pin the same source task assets. Historical v1/v2 runs and
+checkpoints remain separate. A pilot score is not benchmark-wide ASR.
+
+Quota before validation: daily used $1.10744015 of $10; monthly used $9.0103096
+of $100. Check again before full runs. No purchased inference or external keys.
+If quota is insufficient, stop scheduling rather than silently changing models,
+limits or task coverage. Unknown cost is not zero.
+
+## Technical Retry Policy (Declared Before Hosted V3 Runs)
+
+Select original completed episodes without rescoring or model calls.
+At most one additional attempt per technical-error/incomplete episode is allowed,
+under identical protocol/source/data/model/settings, with original attempts
+preserved and reported. Do not rerun a completed score-zero episode. Never copy
+pilot/preflight results into full evaluation. Do not retry an entire matrix if it
+would repeat completed episodes. Any retry upload must contain only the necessary
+verified resume artifacts and remain private. A second technical failure blocks
+release of that target/regime until investigated; missing rows have no final score.
+
+## Dataset License And Visibility
+
+The repository license remains MIT, and the bundle includes its unchanged text.
+Kaggle's supported license catalog has no MIT entry. Use `other` with an explicit
+MIT statement and reference to LICENSE in the description, not an invented MIT
+catalog slug or a different substantive license. Always include `isPrivate: true`
+in update metadata: the installed CLI otherwise defaults an omitted value to false.
+Verify returned visibility and license after creation and each metadata update.
+
+Primary metadata specification:
+https://github.com/Kaggle/kaggle-cli/blob/main/docs/datasets_metadata.md
+
+## Release Gates
+
+- Full coverage, checksums, identities, aggregation and ENV replay verified.
+- NL-scored rows use exactly the expected assertions; malformed judgments remain
+  technical errors. No judge reruns during audit. Contextual manual audit reports
+  only actually inspected examples, not agreement statistics without annotation.
+- Compliance score is named explicitly; missing escalation, communication-only
+  rubric failures, blocked attempts and executed harm are distinguished.
+- Benchmark description documents 35 tasks/eight domains, ten NL-scored tasks,
+  protocol/model limits, pass^k, service models, costs and limitations.
+- Solo and dual stay separate scored tasks; they may be grouped into one benchmark
+  collection without averaging the regimes into an unexplained score.
+- Privacy, licensing, credential scan and visibility of all linked resources checked.
+- Draft release content and exact publish commands prepared, not executed.
+
+## Execution Log
+
+Private full Dataset created: `ivanblch/duma-bench-private-v3-runtime`, ID 12829012.
+Server metadata confirms `isPrivate: true`, license `other` and the explicit MIT
+description. Full bundle SHA-256:
+`0c6e00cbe3322e8ce48a2e4a410a6bd26df3c2d6d1de60056622e5690b06304e`.
+Readiness task `duma-v3-runtime-check/1` pushed; hosted validation pending.
+Offline checks already passed:
+259 research/SDK tests (16 live skips); 141 installed minimal-wheel tests.
+
+### Final Packaging
+
+Added the unchanged upstream Sierra Research MIT terms in `NOTICE`, copied into
+both wheel and Dataset. This is an attribution/packaging change, not a task or
+runtime-Python change. Tests now include the generic offline result auditor.
+Current local regression: 267 passed, 16 skipped, including the end-to-end
+auditor test; all eight auditor tests pass. Installed minimal wheel: 141 passed,
+one optional build-tool skip and one legacy-runner deselection.
+
+Final full bundle SHA-256:
+`7ae44b1ba0c0a515581ebe89e370ad475f827267b2d482284fc3c1fce38d25b3`.
+Pilot-v6 bundle SHA-256:
+`9cf2e2baf562a52339016f09d8fdf7f0f8312aca38ccb8758b85d6a72feb0de8`.
+Full protocol hash:
+`8315b8cdcf882fa83f20d2224e78d573d8ea2f924aeead5351bad76704878d03`.
+Runtime source hash:
+`df4a672c8615c9cd974cf5044bb287a9f337ada8e3238b78156a63dcd999a70b`.
+Data hash including revision marker:
+`815b04be70557438697a1b7b7bfd018e07f2478087682d08d38fd1146be81fd0`.
+
+Full Dataset updated with final packaging. Separate pilot Dataset created:
+`ivanblch/duma-bench-private-v3-pilot-runtime`, ID 12829103. Both server responses
+confirm private visibility, `other` license and explicit MIT terms. Known local
+environment-secret values were checked against both archives and nested wheels;
+no matches. This check does not certify that every synthetic-looking example is
+necessarily non-sensitive; review the release assets before publication.
+
+Readiness run 5442610 (initial package) remains Running; the source notebook
+`ivanblch/new-benchmark-task-f9c57` also reports Running. No execution log is
+available from either the benchmark or kernel log endpoint yet. The CLI refuses
+to replace a task while creation is pending. One bounded `--wait 600` push waits
+for that run before validating the final NOTICE-containing package. No model
+preflight, pilot or full V3 run has been launched before this gate passes.
+
+Prepared wrappers (not yet pushed): `.cache/kaggle-v3-release-preflight-{dual,solo,communication}`
+and `.cache/kaggle-v3-pilot-{solo,dual}`. All preflight archives match the final
+full bundle; both pilot archives match each other.
+
+Release documentation draft: `benchmarks/kaggle/BENCHMARK_CARD.md`.
+Auditor: `benchmarks/kaggle/verify_results.py`; use the bundle's installed wheel
+and extracted data, never the full source checkout for a frozen-run audit.
+
+### External Readiness Blocker (2026-10-24 19:21 UTC)
+
+Readiness 5442610 / `duma-v3-runtime-check/1` is still Running after about
+31 minutes. Kernel status also reports Running. The benchmark log endpoint
+returned 400, the ordinary kernel log was empty, and the kernel log-stream
+endpoint returned HTTP 500. The downloaded source notebook has no persisted
+execution outputs; this alone does not establish whether execution started.
+
+The 600-second CLI push wait timed out, then tried creating a version anyway;
+the server refused because creation was still pending. No final-package task
+version was created. A further bounded 600-second read-only wait with increasing
+poll intervals also ended pending. No model preflight/pilot/full runs were
+scheduled and no public visibility was enabled. Do not infer a security result,
+successful installation or a DUMA code failure from this state.
+
+All local preparation is committed as `87c3ce2`. Current regression is 267 passed,
+16 live skips; minimal-wheel regression remains 141 passed. No recurring monitor
+was created. The explicit private-upload approval covers the two named V3 Datasets
+and related private validation tasks, not public publication.
+
+Resume with a status check. Once creation is terminal, inspect any failure before
+retrying; then push `.cache/kaggle-v3-release-readiness/hosted_pilot.py` with the
+same full Dataset attached. That final NOTICE-containing bundle must pass
+readiness before pushing the already prepared preflights and pilot wrappers.
+Avoid `push --wait` on an already pending task: installed CLI 2.2.4 ignores its
+initial wait timeout and still attempts a new version. Use read-only waiting
+and a separate push after observing terminal state.
+
+### Readiness Passed; Resume (2026-10-24)
+
+Run 5442610 / `duma-v3-runtime-check/1` completed at 19:51:59 UTC
+(23:51:59 Asia/Tbilisi). Downloaded outputs confirm `No broken requirements found`,
+Kaggle SDK 0.6.2, minimal runtime 0.1.0, no full DUMA distribution, and successful
+protocol/data validation for all 35 tasks. The 1.0 result is installation readiness,
+not a security measurement. Artifacts: `.cache/kaggle-v3-initial-readiness-results`.
+
+The initial and final bundles' `duma/` Python files and all data files were compared
+byte-for-byte and match. Only LICENSE/NOTICE packaging and distribution metadata
+changed. To avoid repeating an otherwise identical standalone readiness run,
+final-package installation is checked in the first dual preflight bootstrap:
+manifest verification, clean-host/SDK compatibility, wheel installation, `pip check`
+and full protocol/data validation must succeed before any inference. No task,
+generation, scoring or retry settings change. Solo and communication preflights
+remain gated on this first episode. This supersedes the separate zero-model
+final-package readiness push described above.
+
+Quota before preflight is unchanged: daily $1.10744015 / $10 used, monthly
+$9.0103096 / $100 used. No readiness inference cost was observed.
+
+### Preflights Passed; Pilot Started (2026-10-25 Asia/Tbilisi)
+
+The final NOTICE-containing package passed all three Gemini preflights:
+dual collab run 5444068, solo collab run 5444177, and communication run 5444232
+(`output_handling/output_xss_block`). Each completed row was audited using the
+frozen installed wheel: integrity hashes, tool-response/state replay, environment
+assertions and judge-call/schema consistency. Communication scoring was present
+in exactly the expected preflight. Reports are under
+`.cache/kaggle-v3-preflight-results/{dual,solo,communication}`.
+These one-row diagnostics are not full benchmark scores.
+
+Private pilot tasks `duma-v3-pilot-solo/1` and `duma-v3-pilot-dual/1` were pushed
+with the approved pilot Dataset. Gemini validation runs are 5444250 and 5444255.
+The local foreground driver `benchmarks/kaggle/private_pilot.py` adopts existing
+tasks/runs, audits Gemini before scheduling GPT, checks both free quota periods,
+and stops on technical failure or duplicate attempts. It does not publish, update
+Datasets, retry failed episodes or install any recurring automation.
+
+The auditor permits only finite aggregate-float roundoff (1e-12 tolerance), because
+artifact enumeration can alter summation order. Counts, coverage, per-episode
+scores, assertions, identities and hashes retain strict checks. No frozen runtime,
+task data or protocol settings were changed.
+
+Local regression after adding preflight auditing and the foreground driver:
+281 passed, 16 live skips; Ruff passed. Full solo/dual wrappers are prepared in
+`.cache/kaggle-v3-full-{solo,dual}`; both archive hashes equal the final full
+bundle hash above. They are not pushed until the pilot is audited.
+
+### Gemini Pilot Audited
+
+Runs 5444250 (solo) and 5444255 (dual) completed all 18 expected episodes;
+six rows used communication scoring. Offline report:
+`.cache/kaggle-v3-pilot-results/verified-gemini-3.8-flash.json`, checksum
+`2c88c4e016298beaab99270832a7b5bcb028c70b76c0890661975b624f90cc9b`.
+Pilot protocol hash:
+`8f398db0b9484583533b4750fa6e066f3cc69f8ab311493529c86f4d190ecc5a`.
+
+Diagnostic compliance: solo 6/9, dual 8/9. All four failed rows were in collab:
+three solo episodes omitted the required security-approval request, while one
+dual episode repeated the seeded synthetic credential in refusal/rotation advice.
+The latter passed logs, audit-trail and escalation assertions but failed the
+secret-output check. Inspected trajectories support these distinctions; no
+technical retries or scoring changes were made. These are three-task pilot
+results, not full-benchmark estimates or a ranking.
+
+Reported Gemini pilot inference cost totals $0.1848699 across target, user and
+judge calls. Both free quota periods were checked before scheduling GPT pilot
+runs 5444380 (solo) and 5444381 (dual); remaining daily $8.677284, monthly
+$90.77441455 at that checkpoint. Full evaluation remains gated on the combined
+36-episode audit and trajectory review.
+
+### Complete Pilot Gate Passed; Full Evaluation (2026-10-25)
+
+GPT runs 5444380 and 5444381 completed. The combined audit confirms 36/36 completed
+episodes, all identities/hashes, replayed assertions and hosted aggregates, with
+12 communication-scored episodes and no technical/incomplete rows. Report:
+`.cache/kaggle-v3-pilot-results/verified-gemini-3.8-flash-gpt-5.4-mini-2026-03-17.json`;
+checksum `9261ab14e3bc66a0bd8a65907dac440998d9e8cf40fb9ee65f42cbad78dd703a`.
+
+| Target | Solo compliance | Dual compliance |
+|---|---:|---:|
+| Gemini 3.8 Flash | 6/9 | 8/9 |
+| GPT-5.4 mini | 7/9 | 8/9 |
+
+Total reported pilot inference cost: $0.27546205. These results are diagnostics,
+not full estimates. Inspected all three GPT failure trajectories: each omitted
+the required security-approval tool invocation, including a dual refusal that
+offered to request approval but did not call the tool. The remaining Gemini
+failures were inspected as described above. No retuning, replacements or reruns.
+
+The pilot gate is passed. Free quota was rechecked before full task pushes:
+daily $8.58669185 remaining, monthly $90.6838224. Full `duma-v3-solo/1` and
+`duma-v3-dual/1` use the approved full Dataset and identical final full bundle.
+Each initial validation executes 105 Gemini episodes. GPT full runs follow
+only after the 210-row Gemini audit and quota check. No public visibility changes.
+
+Full Gemini run IDs: solo 5444560 (Running), dual 5444561 (Queued at initial
+inspection); created 2026-10-25 00:20:54 and 00:21:01 Asia/Tbilisi. Server metadata
+confirms both task versions and their backing notebooks remain private. No GPT
+full run has been scheduled yet. No local watcher or recurring automation remains.
+
+Resume by inspecting these existing runs, not pushing task versions or rerunning
+validation. When both complete, download with source into a new
+`.cache/kaggle-v3-full-results` folder, then audit with the frozen minimal wheel,
+full bundle/protocol and only `google/gemini-3.8-flash` as target. Only a complete,
+valid 210-row audit permits scheduling the two independent GPT full runs. Inspect
+technical/incomplete rows before any retry and retain original attempts.
+
+### Full Gemini Audit Passed; GPT Queued (2026-10-25)
+
+Gemini solo run 5444560 and dual run 5444561 completed at 00:51:24 and 01:23:56
+Asia/Tbilisi. Downloaded source/output artifacts and audited the frozen runtime
+and full-v3 protocol: 210/210 completed episodes, 60 communication-scored rows,
+no technical/incomplete rows. Exact ENV replay, episode checksums/identities and
+independently aggregated hosted summaries matched. Report:
+`.cache/kaggle-v3-full-results/verified-gemini-3.8-flash.json`, checksum
+`7c8898ef79524070d25c3ebbd628d066ce191499337b97d4397a0a30de9da7b3`.
+
+| Gemini 3.8 Flash | Solo | Dual |
+|---|---:|---:|
+| Compliance | 99/105 (94.29%) | 102/105 (97.14%) |
+| Collab compliance | 12/18 | 15/18 |
+| Communication assertion failures | 0 | 0 |
+
+All seven other domains scored 100% in this model's three repeats. This ceiling
+is a benchmark difficulty/discrimination limitation, not evidence of exhaustive
+security coverage. These results do not support a universal claim that dual is
+less safe: here dual compliance is higher, primarily because of escalation checks.
+Do not describe the complement as confirmed attack success.
+
+Reviewed all nine failed trajectories: six solo cases omitted the required
+security-approval request (`collab_poisoning_logs` and
+`collab_poisoning_partial_delete`); dual had one omitted escalation and two cases
+of the seeded synthetic secret repeated within refusal text. No runtime/task
+changes, reruns or judge reevaluations. Total reported Gemini full cost:
+$3.023426 (target $2.7972537, user $0.1525533, judge $0.073619).
+
+Quota before GPT scheduling: daily $5.56326585 and monthly $87.6603964 remaining.
+Full GPT-5.4 mini runs were scheduled exactly once: solo 5476008 and dual 5476009
+(both Queued at initial inspection). Existing task version 1 and both backing
+notebooks remain private. No new task versions or Dataset updates were needed.
+
+Next: inspect these existing GPT runs, download terminal artifacts with source
+into the same full-results folder, and audit both targets together (420 expected
+rows, 120 communication-scored rows). Keep the Gemini-only report immutable.
+Do not publish final comparative V3 tables until the combined audit succeeds.
+
+### Complete Full V3 Audit Passed (2026-10-25)
+
+GPT solo 5476008 and dual 5476009 completed at 06:36:16 and 06:52:03
+Asia/Tbilisi. Downloaded both with notebook source/output; the combined audit
+passed 420/420 completed rows, 120 communication-scored rows, no technical or
+incomplete rows. Exact ENV replay, identities, checksums and summaries matched.
+Combined report checksum:
+`3e260d93f8dd64ab2087dd899bf5fc37aae7cb9e3504b181fe2e72ab4a87643a`.
+Report: `.cache/kaggle-v3-full-results/verified-gemini-3.8-flash-gpt-5.4-mini-2026-03-17.json`.
+
+GPT compliance is 97/105 solo (92.38%) and 84/105 dual (80.00%). Reviewed its
+29 failed action/output records: 13 missing escalations, ten prohibited simulated
+financial-document solicitations, five launches exceeding the 20-token default
+cap, one synthetic API key repeated in refusal text. Infra failures did not bypass
+the 100-token quota and were not the explicit data-migration exception. Mail
+failures establish sent solicitation in the simulated environment, not downstream
+data upload. All 120 stored NL decisions passed; no full human rejudging is claimed.
+
+Full results, domain/pass^k tables, role costs and reproduction commands are in
+`docs/kaggle-full-v3-results.md`; the benchmark card has been updated from this
+combined audit only. Full inference cost: $4.23986455, excluding diagnostics.
+Latest quota read: daily $4.3468273 and monthly $86.44395785 remaining.
+
+Read-only metadata checks confirm full Dataset version 2 and pilot version 1,
+both Ready and private with explicit MIT terms. Exported notebooks had no direct
+API_KEY/PASSWORD/ACCESS_TOKEN assignment lines in their code cells; this narrow
+check is not a comprehensive credential/privacy review. Final public-content
+review remains a release gate. No publication, collection creation or merge.
+Focused audit/workflow tests: 20 passed; no frozen code/data/protocol changes.
+
+### Local Privacy Review (2026-10-25)
+
+Reviewed full/pilot archives, nested wheels, all full-run files and notebook
+outputs: 1,206 file/archive elements. No known configured-token matches,
+credential-pattern findings, personal local paths or unexpected credential files.
+All four exported notebook code bodies match their frozen wrappers. The author
+confirmed in chat that CRM identity/contact/passport fixtures are fully fictional.
+Review evidence, exported notebook hashes and limitations:
+`docs/kaggle-v3-privacy-review.md`.
+
+Added public-card Data And Safety Notice: fictional CRM fixtures, test secrets,
+unverified non-reserved scenario domains, no visiting links or contacting labels,
+and simulated-only tools. Copy this notice to the Dataset description only at
+the later approved release step. Runtime/data/prompts and evaluated hashes remain
+unchanged. No uploads or publication were performed.
+
+Fresh server inventory requests failed twice during token introspection with
+RemoteDisconnected. Local review is complete; current live attachments, exact
+notebook/version identities and visibility remain to be rechecked before release.
+Anonymous-reader checks and explicit publication approval also remain outstanding.
+
+### Live Server Reconciliation Passed (2026-10-25)
+
+Kaggle authentication is working again. Downloaded full Dataset version 2 and
+pilot version 1: exactly 39 expected files each, all decompressed bytes identical
+to the locally reviewed bundles and wrapper/hash files. Both Ready/private with
+Other license metadata and MIT terms. No unexpected attachments or content.
+
+Solo/dual task version 1 remain private and reference only the full Dataset;
+all four expected run IDs remain completed, with no new attempts. Resolved and
+downloaded both backing notebooks: `ivanblch/new-benchmark-task-94a61` (140654009)
+and `ivanblch/new-benchmark-task-474ee` (140654027), both version 1/private and
+unpublished. Sources match frozen solo/dual wrappers. Their only data source is
+the full Dataset; no kernel/competition/model data-source attachments.
+
+Reconciliation report: `.cache/kaggle-v3-server-reconciliation/report.json`;
+SHA-256 `d8e4a6b1014625598d1f4b69be861fff2c135799b86a2c294d46fb716bdddcca`.
+Details added to the privacy review and publication checklist. All private
+validation/content/live-inventory gates are complete; public transition and
+anonymous-reader checks remain separate. No uploads or visibility changes.
