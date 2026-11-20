@@ -5,6 +5,7 @@ import os
 from duma.config import (
     DEFAULT_AGENT_IMPLEMENTATION,
     DEFAULT_LLM_AGENT,
+    DEFAULT_LLM_NL_ASSERTIONS,
     DEFAULT_LLM_TEMPERATURE_AGENT,
     DEFAULT_LLM_TEMPERATURE_USER,
     DEFAULT_LLM_USER,
@@ -44,7 +45,7 @@ def add_run_args(parser):
         "--num-trials",
         type=int,
         default=DEFAULT_NUM_TRIALS,
-        help="The number of times each task is run. Default is 1.",
+        help=f"The number of times each task is run. Default is {DEFAULT_NUM_TRIALS}.",
     )
     parser.add_argument(
         "--agent",
@@ -139,7 +140,10 @@ def add_run_args(parser):
     )
     parser.add_argument(
         "--evaluator-llm",
-        help="Override the model used to judge natural-language assertions.",
+        help=(
+            "Override the model used to judge natural-language assertions. "
+            f"Default is {DEFAULT_LLM_NL_ASSERTIONS}."
+        ),
     )
     parser.add_argument(
         "--task-set-name",

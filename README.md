@@ -97,7 +97,7 @@ duma run \
   --domain collab \
   --agent-llm gpt-4.1 \
   --user-llm openai/gpt-4o-mini \
-  --num-trials 5 \
+  --num-trials 4 \
   --num-tasks 5
 
 # Solo (passive-user) evaluation
@@ -140,7 +140,7 @@ duma domain <domain_name>
 
 ## Results
 
-The results below are from the EACL 2027 Findings paper. The main comparison uses 14 target models across eight domains, with four trials per model and task in each regime. The reported experiments used GPT-4o-mini as the fixed dual-control user simulator and GPT-4o at temperature 0.0 as the communication-assertion judge. The Quick Start examples and framework defaults are not the paper configuration. The CLI options for the paper models are `--user-llm openai/gpt-4o-mini` (dual-control) and `--evaluator-llm openai/gpt-4o` (judge).
+The results below are from the EACL 2027 Findings paper. The main comparison uses 14 target models across eight domains. As in the main comparison, this release defaults to four trials per model and task in each regime, GPT-4o-mini for the dual-control user simulator, and GPT-4o at temperature 0.0 for the communication-assertion judge. Override these defaults with `--num-trials`, `--user-llm`, and `--evaluator-llm`. The Quick Start examples are not the full experiment configuration.
 
 ### Solo vs. Dual-Control Comparison
 
@@ -204,6 +204,8 @@ This temperature sweep is separate from the main 14-model comparison.
 | **ALL** | **0.722** | **0.666** | **0.633** | **0.611** | **0.596** |
 
 ### User-Temperature Sensitivity (Dual-Control)
+
+This separate sweep uses nine target models and five trials per model, task, and temperature.
 
 | User temperature | Trials | Successes | pass^1 | ASR |
 |------------------|--------|-----------|--------|-----|
