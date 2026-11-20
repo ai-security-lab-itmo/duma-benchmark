@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import json
 from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-import pandas as pd
+if TYPE_CHECKING:
+    import pandas as pd
+
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
@@ -376,6 +380,8 @@ class Results(BaseModel):
         """
         Convert a Results object to a pandas DataFrame.
         """
+
+        import pandas as pd
 
         def transfer_only(task: Task) -> bool:
             """

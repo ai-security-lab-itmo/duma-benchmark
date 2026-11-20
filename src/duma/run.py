@@ -5,6 +5,12 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ruff: noqa: E402
+
 from loguru import logger
 
 from duma.agent.llm_agent import LLMAgent, LLMGTAgent, LLMSoloAgent
@@ -527,116 +533,28 @@ def run_task(
     max_errors: int = 10,
     evaluation_type: EvaluationType = EvaluationType.ALL_WITH_NL_ASSERTIONS,
     seed: Optional[int] = None,
+    judge_model: Optional[str] = None,
+    judge_args: Optional[dict] = None,
 ) -> SimulationRun:
-    """
-    Runs tasks for a given domain.
-     If llm_as_judge is True, the LLM will be used to annotate the simulation run.
-     Calculates the reward for the simulation run.
-     Args:
-         domain (str): The domain to run the simulation on.
-         task (Task): The task to run.
-         agent (str): The agent to run the simulation on.
-         user (str): The user to run the simulation on.
-         llm_agent (str): The model to use for the agent.
-         llm_args_agent (dict): The arguments to pass to the LLM for the agent.
-         llm_user (str): The model to use for the user.
-         llm_args_user (dict): The arguments to pass to the LLM for the user.
-         max_steps (int): The maximum number of steps to run the simulation.
-         max_errors (int): The maximum number of errors to allow in the simulation.
-         evaluation_type (EvaluationType): The type of evaluation to use.
-         seed (int): The seed to use for the simulation.
-     Returns:
-         The simulation run.
-    """
+    """Compatibility entry point delegating to the shared episode runtime."""
+    from duma.runtime import run_task as execute
 
-    if max_steps <= 0:
-        raise ValueError("Max steps must be greater than 0")
-    if max_errors <= 0:
-        raise ValueError("Max errors must be greater than 0")
-    global registry
-    logger.info(
-        f"STARTING SIMULATION: Domain: {domain}, Task: {task.id}, Agent: {agent}, User: {user}"
-    )
-    environment_constructor = registry.get_env_constructor(domain)
-    environment = environment_constructor()
-    AgentConstructor = registry.get_agent_constructor(agent)
-
-    solo_mode = False
-    if issubclass(AgentConstructor, LLMAgent):
-        agent = AgentConstructor(
-            tools=environment.get_tools(),
-            domain_policy=environment.get_policy(),
-            llm=llm_agent,
-            llm_args=llm_args_agent,
-        )
-    elif issubclass(AgentConstructor, LLMGTAgent):
-        agent = AgentConstructor(
-            tools=environment.get_tools(),
-            domain_policy=environment.get_policy(),
-            llm=llm_agent,
-            llm_args=llm_args_agent,
-            task=task,
-        )
-    elif issubclass(AgentConstructor, LLMSoloAgent):
-        solo_mode = True
-        environment: Environment = environment_constructor(solo_mode=True)
-        user_tools = environment.get_user_tools() if environment.user_tools else []
-        agent = AgentConstructor(
-            tools=environment.get_tools() + user_tools,
-            domain_policy=environment.get_policy(),
-            llm=llm_agent,
-            llm_args=llm_args_agent,
-            task=task,
-        )
-    else:
-        raise ValueError(
-            f"Unknown agent type: {AgentConstructor}. Should be LLMAgent or LLMSoloAgent"
-        )
-    try:
-        user_tools = environment.get_user_tools()
-    except Exception:
-        user_tools = None
-
-    UserConstructor = registry.get_user_constructor(user)
-    if issubclass(UserConstructor, DummyUser):
-        assert isinstance(agent, LLMSoloAgent), (
-            "Dummy user can only be used with solo agent"
-        )
-
-    user = UserConstructor(
-        tools=user_tools,
-        instructions=str(task.user_scenario),
-        llm=llm_user,
-        llm_args=llm_args_user,
-    )
-
-    orchestrator = Orchestrator(
+    return execute(
         domain=domain,
+        task=task,
         agent=agent,
         user=user,
-        environment=environment,
-        task=task,
+        llm_agent=llm_agent,
+        llm_args_agent=llm_args_agent,
+        llm_user=llm_user,
+        llm_args_user=llm_args_user,
         max_steps=max_steps,
         max_errors=max_errors,
-        seed=seed,
-        solo_mode=solo_mode,
-    )
-    simulation = orchestrator.run()
-
-    reward_info = evaluate_simulation(
-        domain=domain,
-        task=task,
-        simulation=simulation,
         evaluation_type=evaluation_type,
-        solo_mode=solo_mode,
+        seed=seed,
+        judge_model=judge_model,
+        judge_args=judge_args,
     )
-
-    simulation.reward_info = reward_info
-
-    logger.info(
-        f"FINISHED SIMULATION: Domain: {domain}, Task: {task.id}, Agent: {agent.__class__.__name__}, User: {user.__class__.__name__}. Reward: {reward_info.reward}"
-    )
-    return simulation
 
 
 def get_info(

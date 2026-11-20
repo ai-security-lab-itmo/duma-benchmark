@@ -4,8 +4,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-import toml
-import yaml
 
 
 def expand_paths(paths: list[str], extension: str | None = None) -> list[str]:
@@ -67,9 +65,13 @@ def load_file(path: str | Path, **kwargs: Any) -> dict[str, Any]:
         with open(path, "r") as fp:
             data = json.load(fp, **kwargs)
     elif path.suffix == ".yaml" or path.suffix == ".yml":
+        import yaml
+
         with open(path, "r") as fp:
             data = yaml.load(fp, Loader=yaml.SafeLoader, **kwargs)
     elif path.suffix == ".toml":
+        import toml
+
         with open(path, "r") as fp:
             data = toml.load(fp, **kwargs)
     elif path.suffix == ".txt" or path.suffix == ".md":
@@ -98,9 +100,13 @@ def dump_file(path: str | Path, data: dict[str, Any], **kwargs: Any) -> None:
         with open(path, "w") as fp:
             json.dump(data, fp, **kwargs)
     elif path.suffix == ".yaml" or path.suffix == ".yml":
+        import yaml
+
         with open(path, "w") as fp:
             yaml.dump(data, fp, **kwargs)
     elif path.suffix == ".toml":
+        import toml
+
         # toml cannot dump the Enum values, so we need to convert them to strings
         data_str = json.dumps(data)
         new_data = json.loads(data_str)

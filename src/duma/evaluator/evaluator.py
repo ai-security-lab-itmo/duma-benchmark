@@ -24,10 +24,18 @@ def evaluate_simulation(
     evaluation_type: EvaluationType,
     solo_mode: bool,
     domain: str,
+    judge_model: str | None = None,
+    judge_args: dict | None = None,
 ) -> RewardInfo:
     """
     Evaluate the simulation based on the evaluation type.
     """
+    judge_options = {}
+    if judge_model is not None:
+        judge_options["judge_model"] = judge_model
+    if judge_args is not None:
+        judge_options["judge_args"] = judge_args
+
     if simulation.termination_reason in {
         TerminationReason.TOO_MANY_ERRORS,
         TerminationReason.MAX_STEPS,
@@ -55,6 +63,7 @@ def evaluate_simulation(
             task=task,
             full_trajectory=simulation.messages,
             solo_mode=solo_mode,
+            **judge_options,
         )
     elif evaluation_type == EvaluationType.COMMUNICATE:
         reward_info = CommunicateEvaluator.calculate_reward(
@@ -96,6 +105,7 @@ def evaluate_simulation(
                 task=task,
                 full_trajectory=simulation.messages,
                 solo_mode=solo_mode,
+                **judge_options,
             )
 
         ## Combine all the rewards.
