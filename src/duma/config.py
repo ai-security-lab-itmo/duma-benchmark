@@ -1,4 +1,5 @@
 import os
+from contextlib import contextmanager
 
 # SIMULATION
 DEFAULT_MAX_STEPS = 200
@@ -26,6 +27,23 @@ DEFAULT_LLM_NL_ASSERTIONS_ARGS = {
     "api_base": os.environ.get("EVALUATOR_API_BASE", ""),
     "api_key": os.environ.get("EVALUATOR_API_KEY", ""),
 }
+
+
+@contextmanager
+def override_nl_evaluator(llm: str | None):
+    """Use a different communication judge for this CLI run only."""
+    global DEFAULT_LLM_NL_ASSERTIONS
+    if llm is None:
+        yield
+        return
+
+    previous_model = DEFAULT_LLM_NL_ASSERTIONS
+    DEFAULT_LLM_NL_ASSERTIONS = llm
+    try:
+        yield
+    finally:
+        DEFAULT_LLM_NL_ASSERTIONS = previous_model
+
 
 DEFAULT_LLM_ENV_INTERFACE = "gpt-4.1"
 DEFAULT_LLM_ENV_INTERFACE_TEMPERATURE = 0.0

@@ -1,5 +1,7 @@
 # DUMA-Bench: Dual-Control Multi-Agent Benchmark for Evaluating LLM Agent Security
 
+**EACL 2027 Findings artifact.** This branch preserves the paper's 35-task benchmark snapshot. The [preprint](https://arxiv.org/abs/2609.24662) is available on arXiv. The paper reports an ASR increase from **26.9% (solo)** to **41.1% (dual-control)**.
+
 [![python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -70,7 +72,7 @@ A task passes only when *all* assertions of *all* types are satisfied.
 **Requirements:** Python 3.10+
 
 ```bash
-git clone https://github.com/anonymous/duma-benchmark.git
+git clone --branch codex/eacl2027-camera-ready https://github.com/ai-security-lab-itmo/duma-benchmark.git
 cd duma-benchmark
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
@@ -94,7 +96,7 @@ DUMA-Bench uses [LiteLLM](https://github.com/BerriAI/litellm) for multi-provider
 duma run \
   --domain collab \
   --agent-llm gpt-4.1 \
-  --user-llm gpt-4.1 \
+  --user-llm openai/gpt-4o-mini \
   --num-trials 5 \
   --num-tasks 5
 
@@ -109,7 +111,7 @@ duma run \
 duma run \
   --domains collab infra_loadshed output_handling \
   --agent-llm gpt-4.1 \
-  --user-llm gpt-4.1 \
+  --user-llm openai/gpt-4o-mini \
   --max-concurrency 2
 ```
 
@@ -138,34 +140,56 @@ duma domain <domain_name>
 
 ## Results
 
+The results below are from the EACL 2027 Findings paper. The main comparison uses 14 target models across eight domains, with four trials per model and task in each regime. The reported experiments used GPT-4o-mini as the fixed dual-control user simulator and GPT-4o at temperature 0.0 as the communication-assertion judge. The Quick Start examples and framework defaults are not the paper configuration. The CLI options for the paper models are `--user-llm openai/gpt-4o-mini` (dual-control) and `--evaluator-llm openai/gpt-4o` (judge).
+
 ### Solo vs. Dual-Control Comparison
 
-| Mode | Trials | pass^1 | ASR |
-|------|--------|--------|-----|
-| Solo (passive-user) | 1960 | 0.746 | 0.254 |
-| Dual-control | 1960 | 0.597 | 0.403 |
+| Mode | Trials | Successes | pass^1 | ASR |
+|------|--------|-----------|--------|-----|
+| Solo (passive-user) | 1960 | 1432 | 0.731 | 0.269 |
+| Dual-control | 1960 | 1154 | 0.589 | 0.411 |
+
+The aggregate ASR increase is **14.2 percentage points**.
 
 ### Domain-Level ASR
 
+Deltas are computed before rounding.
+
 | Domain | Solo ASR | Dual ASR | Delta |
 |--------|----------|----------|-------|
-| `mktg_phishing` | 0.006 | 0.607 | **+0.601** |
-| `collab` | 0.027 | 0.241 | **+0.214** |
-| `crm_leak` | 0.040 | 0.241 | **+0.201** |
-| `tool_shadow_poison` | 0.095 | 0.256 | +0.161 |
-| `auth_spoof_support` | 0.024 | 0.161 | +0.137 |
-| `output_handling` | 0.393 | 0.476 | +0.083 |
-| `infra_loadshed` | 0.473 | 0.533 | +0.060 |
-| `mail_rag_phishing` | 0.594 | 0.571 | -0.023 |
+| `mktg_phishing` | 0.024 | 0.613 | +0.589 |
+| `collab` | 0.042 | 0.250 | +0.208 |
+| `crm_leak` | 0.054 | 0.250 | +0.196 |
+| `tool_shadow_poison` | 0.113 | 0.262 | +0.149 |
+| `auth_spoof_support` | 0.042 | 0.173 | +0.131 |
+| `output_handling` | 0.411 | 0.482 | +0.071 |
+| `infra_loadshed` | 0.488 | 0.542 | +0.054 |
+| `mail_rag_phishing` | 0.610 | 0.579 | -0.031 |
 
-### Pass^1 by Model
+### Model-Level ASR
 
-<div align="center">
-<img src="figs/pass1_by_model.png" width="95%" alt="Pass^1 by Model: solo vs dual-control comparison across 14 LLMs"><br>
-<em>Figure 4: Pass^1 scores for each model under solo and dual-control regimes.</em>
-</div>
+Deltas are computed before rounding.
+
+| Model | Solo ASR | Dual ASR | Delta |
+|-------|----------|----------|-------|
+| Claude Haiku 4.5 | 0.079 | 0.121 | +0.043 |
+| Claude Opus 4.5 | 0.071 | 0.164 | +0.093 |
+| Claude Sonnet 4.5 | 0.050 | 0.086 | +0.036 |
+| GPT-4.1 | 0.336 | 0.386 | +0.050 |
+| GPT-4.1-mini | 0.293 | 0.357 | +0.064 |
+| GPT-4o | 0.314 | 0.393 | +0.079 |
+| GPT-4o-mini | 0.436 | 0.557 | +0.121 |
+| GPT-5 | 0.257 | 0.650 | +0.393 |
+| GPT-5-mini | 0.279 | 0.729 | +0.450 |
+| GPT-5-nano | 0.314 | 0.793 | +0.479 |
+| DeepSeek V3.2 | 0.343 | 0.393 | +0.050 |
+| Qwen3.5-Flash | 0.329 | 0.421 | +0.093 |
+| Qwen3.5-Plus | 0.393 | 0.357 | -0.036 |
+| GLM-4.7 | 0.279 | 0.350 | +0.071 |
 
 ### Pass^k by Domain (Dual-Control, All Temperatures)
+
+This temperature sweep is separate from the main 14-model comparison.
 
 | Domain | pass^1 | pass^2 | pass^3 | pass^4 | pass^5 |
 |--------|--------|--------|--------|--------|--------|
@@ -179,14 +203,17 @@ duma domain <domain_name>
 | `tool_shadow_poison` | 0.926 | 0.879 | 0.847 | 0.826 | 0.811 |
 | **ALL** | **0.722** | **0.666** | **0.633** | **0.611** | **0.596** |
 
-### Pass^k by User Temperature (Dual-Control)
+### User-Temperature Sensitivity (Dual-Control)
 
-| | T=0.0 | T=0.5 | T=1.0 |
-|--------|-------|-------|-------|
-| pass^1 | 0.716 | 0.719 | 0.730 |
-| pass^2 | 0.661 | 0.662 | 0.675 |
-| pass^3 | 0.630 | 0.628 | 0.642 |
-| pass^4 | 0.609 | 0.605 | 0.620 |
+| User temperature | Trials | Successes | pass^1 | ASR |
+|------------------|--------|-----------|--------|-----|
+| 0.0 | 1575 | 1127 | 0.716 | 0.284 |
+| 0.5 | 1575 | 1133 | 0.719 | 0.281 |
+| 1.0 | 1575 | 1150 | 0.730 | 0.270 |
+
+### Full trajectories
+
+The [qualitative examples](traces/README.md) are included here. The full experiment trajectories are not stored in this Git repository; a separate Hugging Face dataset is planned.
 
 ## Project Structure
 

@@ -15,6 +15,7 @@ from duma.config import (
     DEFAULT_NUM_TRIALS,
     DEFAULT_SEED,
     DEFAULT_USER_IMPLEMENTATION,
+    override_nl_evaluator,
 )
 from duma.data_model.simulation import RunConfig
 from duma.run import get_options, run_domain, run_domains
@@ -135,6 +136,10 @@ def add_run_args(parser):
         "--local-models",
         action="store_true",
         help="Use local models (skip injecting api_key/api_base).",
+    )
+    parser.add_argument(
+        "--evaluator-llm",
+        help="Override the model used to judge natural-language assertions.",
     )
     parser.add_argument(
         "--task-set-name",
@@ -368,20 +373,18 @@ def run_command(args):
 
     available_domains = get_options().domains
 
-    if args.domains:
-        # Multi-domain run
-        if args.domain:
-            raise ValueError(
-                "Cannot use both --domain and --domains. Use --domains for multiple domains."
-            )
-        domains = available_domains if "all" in args.domains else args.domains
-        return run_domains(domains=domains, config=config)
-    else:
-        # Single domain run
-        if not args.domain:
-            raise ValueError("Either --domain or --domains must be specified.")
+    if args.domains and args.domain:
+        raise ValueError(
+            "Cannot use both --domain and --domains. Use --domains for multiple domains."
+        )
+    if not args.domains and not args.domain:
+        raise ValueError("Either --domain or --domains must be specified.")
+
+    with override_nl_evaluator(args.evaluator_llm):
+        if args.domains:
+            domains = available_domains if "all" in args.domains else args.domains
+            return run_domains(domains=domains, config=config)
         if args.domain == "all":
-            # Treat single-domain 'all' as a multi-domain run
             return run_domains(domains=available_domains, config=config)
         config.domain = args.domain
         return run_domain(config)

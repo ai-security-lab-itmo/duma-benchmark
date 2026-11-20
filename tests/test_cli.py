@@ -1,8 +1,11 @@
+import argparse
 from types import SimpleNamespace
 
 import pytest
 
 import duma.cli as cli
+from duma import config
+from duma.evaluator import evaluator_nl_assertions
 from duma.registry import RegistryInfo
 
 
@@ -18,6 +21,7 @@ def _args(**overrides):
         "agent_llm_args": {"temperature": 0.0},
         "agent_base_url": None,
         "agent_provider": None,
+        "evaluator_llm": None,
         "user": "user_simulator",
         "user_llm": "gpt-4o-mini",
         "user_llm_args": {"temperature": 0.0},
@@ -83,6 +87,38 @@ def test_run_command_domain_all_uses_multi_domain(monkeypatch):
     )
     cli.run_command(_args(domain="all"))
     assert called["domains"] == ["collab", "crm_leak"]
+
+
+@pytest.mark.parametrize(
+    "judge, expected_model",
+    [(None, config.DEFAULT_LLM_NL_ASSERTIONS), ("openai/gpt-4o", "openai/gpt-4o")],
+)
+def test_run_command_passes_evaluator_model_to_judge(monkeypatch, judge, expected_model):
+    default_model = config.DEFAULT_LLM_NL_ASSERTIONS
+    calls = []
+
+    def generate(**kwargs):
+        calls.append((kwargs["model"], kwargs["temperature"]))
+        return SimpleNamespace(content='{"results": []}')
+
+    def run_domain(run_config):
+        assert run_config.llm_user == "openai/gpt-4o-mini"
+        evaluator_nl_assertions.NLAssertionsEvaluator.evaluate_nl_assertions(
+            [], ["The response follows policy."]
+        )
+
+    monkeypatch.setattr(cli, "get_options", _options)
+    monkeypatch.setattr(cli, "run_domain", run_domain)
+    monkeypatch.setattr(evaluator_nl_assertions, "generate", generate)
+    parser = argparse.ArgumentParser()
+    cli.add_run_args(parser)
+    args = ["--domain", "collab", "--user-llm", "gpt-4o-mini"]
+    if judge is not None:
+        args.extend(["--evaluator-llm", judge])
+    cli.run_command(parser.parse_args(args))
+
+    assert calls == [(expected_model, 0.0)]
+    assert config.DEFAULT_LLM_NL_ASSERTIONS == default_model
 
 
 def test_build_llm_args_local_models_strips_api_credentials():
