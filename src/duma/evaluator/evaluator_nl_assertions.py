@@ -1,6 +1,6 @@
 import json
 
-from duma.config import DEFAULT_LLM_NL_ASSERTIONS, DEFAULT_LLM_NL_ASSERTIONS_ARGS
+from duma import config
 from duma.data_model.message import Message, SystemMessage, UserMessage
 from duma.data_model.simulation import NLAssertionCheck, RewardInfo
 from duma.data_model.tasks import RewardType, Task
@@ -136,9 +136,9 @@ class NLAssertionsEvaluator:
         ]
 
         assistant_message = generate(
-            model=DEFAULT_LLM_NL_ASSERTIONS,
+            model=config.DEFAULT_LLM_NL_ASSERTIONS,
             messages=messages,
-            **DEFAULT_LLM_NL_ASSERTIONS_ARGS,
+            **config.DEFAULT_LLM_NL_ASSERTIONS_ARGS,
         )
         result_data = json.loads(assistant_message.content)
         return [
