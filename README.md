@@ -72,7 +72,7 @@ A task passes only when *all* assertions of *all* types are satisfied.
 **Requirements:** Python 3.10+
 
 ```bash
-git clone --branch codex/eacl2027-camera-ready https://github.com/ai-security-lab-itmo/duma-benchmark.git
+git clone --branch preprint/eacl2027-camera-ready https://github.com/ai-security-lab-itmo/duma-benchmark.git
 cd duma-benchmark
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
