@@ -140,7 +140,7 @@ duma domain <domain_name>
 
 ## Results
 
-The results below are from the EACL 2027 Findings paper. The main comparison uses 14 target models across eight domains. As in the main comparison, this release defaults to four trials per model and task in each regime, GPT-4o-mini for the dual-control user simulator, and GPT-4o at temperature 0.0 for the communication-assertion judge. Override these defaults with `--num-trials`, `--user-llm`, and `--evaluator-llm`. The Quick Start examples are not the full experiment configuration.
+The results below are from the EACL 2027 Findings paper. The main comparison uses 14 target models across eight domains, with four trials per model and task in each regime. The CLI defaults to one trial for quick checks; pass `--num-trials 4` for the main comparison. As in the paper, this release defaults to GPT-4o-mini for the dual-control user simulator and GPT-4o at temperature 0.0 for the communication-assertion judge. Override the models with `--user-llm` and `--evaluator-llm`. The Quick Start examples are not the full experiment configuration.
 
 ### Solo vs. Dual-Control Comparison
 

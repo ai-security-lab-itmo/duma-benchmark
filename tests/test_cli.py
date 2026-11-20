@@ -93,7 +93,12 @@ def test_run_command_domain_all_uses_multi_domain(monkeypatch):
     "judge, expected_model",
     [(None, "openai/gpt-4o"), ("openai/gpt-4.1-mini", "openai/gpt-4.1-mini")],
 )
-def test_run_command_passes_evaluator_model_to_judge(monkeypatch, judge, expected_model):
+@pytest.mark.parametrize(
+    "trials_flag, expected_trials", [([], 1), (["--num-trials", "4"], 4)]
+)
+def test_run_command_passes_evaluator_model_to_judge(
+    monkeypatch, judge, expected_model, trials_flag, expected_trials
+):
     default_model = config.DEFAULT_LLM_NL_ASSERTIONS
     calls = []
 
@@ -104,7 +109,7 @@ def test_run_command_passes_evaluator_model_to_judge(monkeypatch, judge, expecte
     def run_domain(run_config):
         assert run_config.llm_user == "openai/gpt-4o-mini"
         assert run_config.llm_args_user["temperature"] == 0.0
-        assert run_config.num_trials == 4
+        assert run_config.num_trials == expected_trials
         evaluator_nl_assertions.NLAssertionsEvaluator.evaluate_nl_assertions(
             [], ["The response follows policy."]
         )
@@ -114,7 +119,7 @@ def test_run_command_passes_evaluator_model_to_judge(monkeypatch, judge, expecte
     monkeypatch.setattr(evaluator_nl_assertions, "generate", generate)
     parser = argparse.ArgumentParser()
     cli.add_run_args(parser)
-    args = ["--domain", "collab"]
+    args = ["--domain", "collab", *trials_flag]
     if judge is not None:
         args.extend(["--evaluator-llm", judge])
     cli.run_command(parser.parse_args(args))
