@@ -1,6 +1,6 @@
 # DUMA-Bench: Dual-Control Multi-Agent Benchmark for Evaluating LLM Agent Security
 
-**EACL 2027 Findings artifact.** This branch preserves the paper's 35-task benchmark snapshot. The [preprint](https://arxiv.org/abs/2609.24662) is available on arXiv. The paper reports an ASR increase from **26.9% (solo)** to **41.1% (dual-control)**.
+**EACL 2027 Findings artifact.** This release preserves the paper's 35-task benchmark snapshot. The [preprint](https://arxiv.org/abs/2609.24662) is available on arXiv. The paper reports an ASR increase from **26.9% (solo)** to **41.1% (dual-control)**.
 
 [![python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -69,13 +69,13 @@ A task passes only when *all* assertions of *all* types are satisfied.
 
 ## Installation
 
-**Requirements:** Python 3.10+
+**Requirements:** Python 3.10+ and `uv` for installation from the lockfile.
 
 ```bash
-git clone --branch preprint/eacl2027-camera-ready https://github.com/ai-security-lab-itmo/duma-benchmark.git
+git clone --branch eacl2027-camera-ready https://github.com/ai-security-lab-itmo/duma-benchmark.git
 cd duma-benchmark
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
+uv sync --locked
+source .venv/bin/activate
 ```
 
 Verify the installation:
@@ -140,7 +140,7 @@ duma domain <domain_name>
 
 ## Results
 
-The results below are from the EACL 2027 Findings paper. The main comparison uses 14 target models across eight domains, with four trials per model and task in each regime. The CLI defaults to one trial for quick checks; pass `--num-trials 4` for the main comparison. As in the paper, this release defaults to GPT-4o-mini for the dual-control user simulator and GPT-4o at temperature 0.0 for the communication-assertion judge. Override the models with `--user-llm` and `--evaluator-llm`. The Quick Start examples are not the full experiment configuration.
+The results below are from the EACL 2027 Findings paper. The main comparison uses 14 target models across eight domains, with four trials per model and task in each regime. The CLI defaults to one trial for quick checks; pass `--num-trials 4` for the main comparison or `--num-trials 5` for the separate user-temperature sweep. As in the paper, this release defaults to GPT-4o-mini for the dual-control user simulator and GPT-4o at temperature 0.0 for the communication-assertion judge. See the [experiment settings](scripts/README.md#paper-protocol) for details. The Quick Start examples are not the full experiment configuration.
 
 ### Solo vs. Dual-Control Comparison
 
@@ -213,9 +213,9 @@ This separate sweep uses nine target models and five trials per model, task, and
 | 0.5 | 1575 | 1133 | 0.719 | 0.281 |
 | 1.0 | 1575 | 1150 | 0.730 | 0.270 |
 
-### Full trajectories
+### Trajectory dataset
 
-The [qualitative examples](traces/README.md) are included here. The full experiment trajectories are not stored in this Git repository; a separate Hugging Face dataset is planned.
+We compiled a large dataset of simulated interaction trajectories for agent security research. The `main` configuration of the [DUMA-Bench dataset on Hugging Face](https://huggingface.co/datasets/Ivanich/duma-bench-episodes) is designated for trajectories from the paper's experiments. The repository documents [qualitative examples](traces/README.md); source archives omit the raw trajectory JSON files.
 
 ## Project Structure
 
@@ -241,7 +241,7 @@ duma-benchmark/
 
 ```bash
 make test                            # Run full test suite
-pytest tests/test_domains/collab     # Run tests for a single domain
+pytest tests/test_domains/test_collab  # Run tests for a single domain
 ```
 
 ## Configuration

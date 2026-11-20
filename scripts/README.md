@@ -1,57 +1,24 @@
 # scripts/
 
-Minimal set of useful commands for working with results in `data/simulations`.
+Utilities for experiment settings and results in `data/duma/simulations`.
 
-## Quickly rebuild paper (tables + plots + PDF)
+## Paper protocol
 
-```bash
-./.venv/bin/python scripts/run_experiments_and_generate_tables.py \
-  --skip-experiments \
-  --models gpt-4o gpt-4o-mini \
-  --temperatures 0.0 0.5 1.0 \
-  --domains mail_rag_phishing collab output_handling \
-  --num-trials 10 \
-  --results-dir data/simulations
-```
+| Experiment | Target models | Evaluation regime | Trials per model and task |
+|---|---|---|---|
+| Main comparison | 14 (Table 4) | Solo and dual-control | 4 per regime |
+| User-temperature sweep | 9 (Appendix B) | Dual-control | 5 per temperature (0.0, 0.5, 1.0) |
 
-Output artifacts:
-- `docs/paper_template/template.tex`, `docs/paper_template/template.pdf`
-- tables: `docs/paper_template/model_domain_table.tex`, `docs/paper_template/significance_table.tex`, `docs/paper_template/temperature_significance_table.tex`, `docs/paper_template/detailed_metrics_table.tex`
-- plots: `docs/paper_template/figs/*.pdf`
+Use `--num-trials 4` or `--num-trials 5` explicitly; `duma run` defaults
+to one trial. Use `--user-llm openai/gpt-4o-mini` in dual-control and
+`--agent llm_agent_solo --user dummy_user` in solo. The communication judge
+is `--evaluator-llm openai/gpt-4o` at temperature 0.0 in both regimes.
+The simulator temperature does not change the agent or judge temperature.
 
-## Run / resume experiments (main pipeline)
-
-```bash
-./scripts/run_experiments.sh \
-  --models gpt-4o gpt-4o-mini \
-  --temperatures 0.0 0.5 1.0 \
-  --domains mail_rag_phishing collab output_handling \
-  --num-trials 10 \
-  --max-concurrency 2 \
-  --duma-max-concurrency 1
-```
-
-## Retry only missing results
-
-If some files in `data/simulations` are incomplete/missing:
-
-```bash
-./.venv/bin/python scripts/retry_failed_experiments.py \
-  --models gpt-4o gpt-4o-mini \
-  --temperatures 0.0 0.5 1.0 \
-  --num-trials 10 \
-  --max-concurrency 1 \
-  --duma-max-concurrency 3
-```
-
-## Maximum load (aggressive)
-
-Auto-rollback on rate limit / timeout.
-
-```bash
-export OPENAI_API_KEY=...  # or OPENROUTER_API_KEY (if OpenRouter routing is configured)
-./scripts/max_load_retry.sh
-```
+The experiment helper has the same simulator and judge defaults. Its
+default model and domain lists are examples, not the paper's experiment
+matrix. Use the paper's model settings, task list, and seeds rather than
+assuming the helper defaults reproduce the reported numbers.
 
 ## Verify metrics correctness
 
@@ -59,12 +26,8 @@ export OPENAI_API_KEY=...  # or OPENROUTER_API_KEY (if OpenRouter routing is con
 ./.venv/bin/python scripts/test_all_metrics.py
 ```
 
-## Benchmark suite (for a full run)
+## Example suite configuration
 
-```bash
-./.venv/bin/python scripts/run_benchmark_suite.py --config scripts/benchmark_config_example.json
-```
-
-## Archive
-
-Irrelevant/helper scripts and notebooks have been moved to `scripts/_archive/`.
+[`benchmark_config_example.json`](benchmark_config_example.json) illustrates
+the suite configuration with one trial and a limited model and domain list.
+It is not a paper reproduction configuration.

@@ -39,6 +39,11 @@ scripts_dir = Path(__file__).parent
 if str(scripts_dir) not in sys.path:
     sys.path.insert(0, str(scripts_dir))
 
+from duma.config import (
+    DEFAULT_LLM_NL_ASSERTIONS,
+    DEFAULT_LLM_NL_ASSERTIONS_TEMPERATURE,
+    DEFAULT_LLM_USER,
+)
 from duma.utils.model_ref import normalize_model_ref
 
 
@@ -60,7 +65,7 @@ def run_all_experiments(
     run_dir_name: str = "",  # Subdirectory name under simulations/ (e.g. "run_20260304_143000")
     parallel_experiments: int = 4,  # Number of parallel experiments
     force_rerun: bool = False,  # Force rerun all experiments
-    user_llm: Optional[str] = None,  # Model for user simulation
+    user_llm: str = DEFAULT_LLM_USER,
     solo: bool = False,  # Solo mode (agent without user)
     agent_base_url: Optional[str] = None,  # Base URL for LLM provider
     api_key_env: Optional[str] = None,  # Environment variable name for API key
@@ -147,6 +152,7 @@ def run_all_experiments(
     # In dual-control mode, temperatures control the user simulator and
     # agent_temperature is used for the agent.
     user_temperatures = [agent_temperature] if solo else temperatures
+    user_tag = _sanitize_model_for_filename(_model_id_for_results(user_llm)) if not solo else ""
 
     commands = []
     for model in models:
@@ -171,10 +177,7 @@ def run_all_experiments(
                     if solo:
                         file_name = f"paper_results_solo_{domain}_{_sanitize_model_for_filename(model_id)}_T{agent_temperature}_{task}"
                     else:
-                        # Determine user model
-                        effective_user_llm = user_llm if user_llm else model
-                        user_model_id = _model_id_for_results(effective_user_llm)
-                        file_name = f"paper_results_{domain}_{_sanitize_model_for_filename(model_id)}_U{_sanitize_model_for_filename(user_model_id)}_UT{user_temp}_{task}"
+                        file_name = f"paper_results_{domain}_{_sanitize_model_for_filename(model_id)}_U{user_tag}_UT{user_temp}_{task}"
 
                     # Actual path to the result file
                     output_file = actual_output_dir / f"{file_name}.json"
@@ -208,7 +211,6 @@ def run_all_experiments(
                             str(duma_max_concurrency),
                         ]
                     else:
-                        effective_user_llm = user_llm if user_llm else model
                         cmd = [
                             "duma",
                             "run",
@@ -219,7 +221,7 @@ def run_all_experiments(
                             "--agent-llm-args",
                             json.dumps({"temperature": agent_temperature}),
                             "--user-llm",
-                            effective_user_llm,
+                            user_llm,
                             "--user-llm-args",
                             json.dumps({"temperature": user_temp}),
                             "--num-trials",
@@ -231,6 +233,7 @@ def run_all_experiments(
                             "--max-concurrency",
                             str(duma_max_concurrency),
                         ]
+                    cmd += ["--evaluator-llm", DEFAULT_LLM_NL_ASSERTIONS]
                     # Add base URL and API key env if specified
                     if agent_base_url:
                         cmd += ["--agent-base-url", agent_base_url]
@@ -506,8 +509,8 @@ def main():
     parser.add_argument(
         "--user-llm",
         type=str,
-        default=None,
-        help="Model for user simulation (default: same as agent)",
+        default=DEFAULT_LLM_USER,
+        help=f"Model for user simulation (default: {DEFAULT_LLM_USER})",
     )
     parser.add_argument(
         "--temperatures",
@@ -594,7 +597,9 @@ def main():
         "user_temperatures": args.temperatures,
         "domains": args.domains,
         "num_trials": args.num_trials,
-        "user_llm": args.user_llm,
+        "user_llm": None if args.solo else args.user_llm,
+        "evaluator_llm": DEFAULT_LLM_NL_ASSERTIONS,
+        "judge_temperature": DEFAULT_LLM_NL_ASSERTIONS_TEMPERATURE,
         "solo": args.solo,
         "max_concurrency": args.max_concurrency,
         "duma_max_concurrency": args.duma_max_concurrency,
