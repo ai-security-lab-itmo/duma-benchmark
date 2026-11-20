@@ -215,6 +215,10 @@ Reported in Table 3 of the preprint. This separate experiment uses the nine-mode
 | 0.5 | 1575 | 1133 | 0.719 | 0.281 |
 | 1.0 | 1575 | 1150 | 0.730 | 0.270 |
 
+### Trajectory dataset
+
+We collected **16,947 simulated interaction episodes** for agent security research. The `main` configuration of the [DUMA-Bench dataset on Hugging Face](https://huggingface.co/datasets/Ivanich/duma-bench-episodes) is designated for the paper's experiments.
+
 ## Project Structure
 
 ```
